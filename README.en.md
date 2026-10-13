@@ -19,7 +19,7 @@
 ## 🌐 Language / Bahasa
 
 - Default language: **English**. Just press **Enter** at the language prompt.
-- Pilih **2) Indonesia** for Indonesian installer.
+- Select **2) Indonesia** for the Indonesian installer.
 - Non-interactive / automation:
   ```bash
   sudo ./install.sh --yes                 # English (default)

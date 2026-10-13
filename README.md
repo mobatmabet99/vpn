@@ -193,9 +193,9 @@ Lihat semua opsi:
 1. Validasi root & keberadaan `/dev/net/tun`.
 2. Tanya bahasa instalasi (default English), simpan ke `/etc/vpn/lang`.
 3. Deteksi OS (Ubuntu/Debian/RHEL/...) — distro asing diberi peringatan dan diminta konfirmasi, kecuali dipaksa.
-3. Deteksi interface jaringan utama & IP publik server.
-4. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
-5. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
+4. Deteksi interface jaringan utama & IP publik server.
+5. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
+6. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
 6. Instal paket WireGuard + aktifkan IP forwarding & optimasi throughput (BBR, buffer TCP).
 7. Buka port UDP WireGuard di UFW / firewalld.
 8. Generate server keypair, tulis `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), simpan `params`.

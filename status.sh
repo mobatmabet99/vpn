@@ -154,7 +154,7 @@ else
   echo -e "$(T "Monitor service       : " "Monitor Service       : ")${_C_YELLOW}[$(T "NOT INSTALLED" "BELUM TERPASANG")]${_C_RESET}"
 fi
 if [[ -f /var/lib/vpn-limits/limits.db ]]; then
-  echo "$(T "Users with limits     : $(grep -c . /var/lib/vpn-limits/limits.db 2>/dev/null || echo 0)" "User terdaftar limit  : $(grep -c . /var/lib/vpn-limits/limits.db 2>/dev/null || echo 0)")"
+  echo "$(T "Users with limits     : $(grep -c . /var/lib/vpn-limits/limits.db 2>/dev/null || true)" "User terdaftar limit  : $(grep -c . /var/lib/vpn-limits/limits.db 2>/dev/null || true)")"
 fi
 if [[ -f /var/lib/vpn-limits/suspended.db && -s /var/lib/vpn-limits/suspended.db ]]; then
   echo -e "$(T "Suspended users       : " "User di-suspend       : ")${_C_RED}$(cut -d: -f1 /var/lib/vpn-limits/suspended.db | tr '\n' ' ')${_C_RESET}"

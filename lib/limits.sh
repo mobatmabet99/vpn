@@ -244,7 +244,7 @@ session_count_ips() {
   [[ -f "$SESSION_DB" ]] || { echo "0"; return 0; }
   local cutoff
   cutoff="$(($(date +%s) - SESSION_WINDOW_DEFAULT))"
-  grep "^${user}:" "$SESSION_DB" 2>/dev/null | awk -F: -v cut="$cutoff" 'NF==3 && $3 >= cut {print $2}' | sort -u | grep -c . || echo "0"
+  grep "^${user}:" "$SESSION_DB" 2>/dev/null | awk -F: -v cut="$cutoff" 'NF==3 && $3 >= cut {print $2}' | sort -u | grep -c . 2>/dev/null || true
 }
 
 session_list_ips() {
