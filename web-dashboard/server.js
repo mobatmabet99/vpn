@@ -93,8 +93,47 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// v3.1: simple in-memory rate limiter (per-IP, per-endpoint)
+// Protects login and API endpoints from brute-force / abuse.
+const _rateBuckets = {};
+function rateLimit(maxRequests, windowMs) {
+  return (req, res, next) => {
+    const key = `${req.ip}:${req.path}`;
+    const now = Date.now();
+    const bucket = _rateBuckets[key] || { count: 0, resetAt: now + windowMs };
+    if (now > bucket.resetAt) {
+      bucket.count = 0;
+      bucket.resetAt = now + windowMs;
+    }
+    bucket.count += 1;
+    _rateBuckets[key] = bucket;
+    if (bucket.count > maxRequests) {
+      const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+
+// v3.1: whitelist-based name validator (prevents command injection via API input)
+function isValidName(name, maxLen) {
+  if (typeof name !== 'string') return false;
+  if (name.length === 0 || name.length > maxLen) return false;
+  return /^[a-zA-Z0-9_-]+$/.test(name);
+}
+
 // Helper function to run VPN scripts
 async function runScript(scriptName, ...args) {
+  // v3.1: allow only known internal scripts and safe argument characters
+  if (!/^[a-z0-9-]+\.sh$/.test(scriptName)) {
+    return { success: false, output: 'Blocked: unknown script' };
+  }
+  for (const a of args) {
+    if (!/^[a-zA-Z0-9_\-., ]*$/.test(String(a))) {
+      return { success: false, output: 'Blocked: invalid characters in argument' };
+    }
+  }
   const scriptPath = path.join(config.scriptDir, scriptName);
   const command = `sudo bash ${scriptPath} ${args.join(' ')}`;
   
@@ -108,8 +147,8 @@ async function runScript(scriptName, ...args) {
 
 // Routes
 
-// Login
-app.post('/api/login', (req, res) => {
+// Login (v3.1: strict rate limit against brute-force)
+app.post('/api/login', rateLimit(10, 60 * 1000), (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -128,13 +167,18 @@ app.post('/api/login', (req, res) => {
   res.json({ token, username });
 });
 
-// Change password
-app.post('/api/change-password', authenticateToken, (req, res) => {
+// Change password (v3.1: enforce minimum password length + rate limit)
+app.post('/api/change-password', authenticateToken, rateLimit(10, 60 * 1000), (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const username = req.user.username;
 
   if (!bcrypt.compareSync(oldPassword, config.users[username])) {
     return res.status(401).json({ error: 'Invalid old password' });
+  }
+
+  // v3.1: minimum 8 characters for new password
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
   }
 
   config.users[username] = bcrypt.hashSync(newPassword, 10);
@@ -163,12 +207,17 @@ app.get('/api/wireguard/clients', authenticateToken, async (req, res) => {
   }
 });
 
-// WireGuard - Add client
-app.post('/api/wireguard/clients', authenticateToken, async (req, res) => {
+// WireGuard - Add client (v3.1: validate client name, rate limit)
+app.post('/api/wireguard/clients', authenticateToken, rateLimit(30, 60 * 1000), async (req, res) => {
   const { name, maxIp = '2', maxGb = '100' } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'Client name required' });
+  }
+
+  // v3.1: whitelist validation (letters/numbers/dash/underscore, max 32 chars)
+  if (!isValidName(name, 32)) {
+    return res.status(400).json({ error: 'Invalid client name. Use letters, numbers, dash or underscore only (max 32 chars).' });
   }
 
   try {
@@ -203,12 +252,17 @@ app.get('/api/wireguard/clients/:name/qr', authenticateToken, (req, res) => {
   }
 });
 
-// SSH - Add user
-app.post('/api/ssh/users', authenticateToken, async (req, res) => {
+// SSH - Add user (v3.1: validate username, rate limit)
+app.post('/api/ssh/users', authenticateToken, rateLimit(30, 60 * 1000), async (req, res) => {
   const { username, password = '', days = '30', maxIp = '2', maxGb = '100' } = req.body;
 
   if (!username) {
     return res.status(400).json({ error: 'Username required' });
+  }
+
+  // v3.1: whitelist validation (letters/numbers/dash/underscore, max 32 chars)
+  if (!isValidName(username, 32)) {
+    return res.status(400).json({ error: 'Invalid username. Use letters, numbers, dash or underscore only (max 32 chars).' });
   }
 
   try {
@@ -231,12 +285,17 @@ app.delete('/api/ssh/users/:username', authenticateToken, async (req, res) => {
   }
 });
 
-// Xray - Add user
-app.post('/api/xray/users', authenticateToken, async (req, res) => {
+// Xray - Add user (v3.1: validate user name, rate limit)
+app.post('/api/xray/users', authenticateToken, rateLimit(30, 60 * 1000), async (req, res) => {
   const { name, maxIp = '2', maxGb = '100' } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'User name required' });
+  }
+
+  // v3.1: whitelist validation (letters/numbers/dash/underscore, max 32 chars)
+  if (!isValidName(name, 32)) {
+    return res.status(400).json({ error: 'Invalid user name. Use letters, numbers, dash or underscore only (max 32 chars).' });
   }
 
   try {

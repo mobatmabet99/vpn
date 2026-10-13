@@ -581,21 +581,27 @@
         }
         
         async function addWgClient() {
-            const name = document.getElementById('wgName').value;
+            const name = document.getElementById('wgName').value.trim();
             const maxIp = document.getElementById('wgMaxIp').value || '2';
             const maxGb = document.getElementById('wgMaxGb').value || '100';
-            
+
+            // v3.1: client-side validation (same rule as server)
             if (!name) {
                 showAlert('Client name required', 'error');
                 return;
             }
-            
+            if (!/^[a-zA-Z0-9_-]{1,32}$/.test(name)) {
+                showAlert('Invalid client name. Use letters, numbers, dash or underscore only (max 32 chars).', 'error');
+                return;
+            }
+
+            showAlert('Creating WireGuard client, please wait...');
             try {
                 await apiCall('/wireguard/clients', {
                     method: 'POST',
                     body: JSON.stringify({ name, maxIp, maxGb })
                 });
-                
+
                 showAlert('WireGuard client created successfully!');
                 document.getElementById('wgName').value = '';
                 loadWgClients();
@@ -710,9 +716,10 @@
         }
         
         async function restartService(service) {
-            if (!confirm(`Restart ${service}?`)) return;
-            
-            showAlert(`Restarting ${service}...`);
+            // v3.1: clearer warning before interrupting live VPN connections
+            if (!confirm(`Restart "${service}"?\n\nThis may briefly interrupt VPN connections.`)) return;
+
+            showAlert(`Restarting ${service}... please wait`);
             try {
                 await apiCall(`/services/restart/${service}`, { method: 'POST' });
                 showAlert(`${service} restarted successfully!`);

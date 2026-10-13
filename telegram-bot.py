@@ -78,16 +78,18 @@ def run_script(script_name: str, *args) -> tuple:
         return False, f"Script not found: {script_name}"
     
     try:
+        # v3.1: longer timeout (120s) for slow operations like first backup / installs
         cmd = ['sudo', 'bash', script_path] + list(args)
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120
         )
         return result.returncode == 0, result.stdout + result.stderr
     except subprocess.TimeoutExpired:
-        return False, "Command timeout"
+        # v3.1: clearer timeout message for slow server operations
+        return False, "Command timed out after 120s (server may be busy, try again)."
     except Exception as e:
         return False, f"Error: {str(e)}"
 

@@ -30,8 +30,20 @@ BACKUP_TYPE="${1:-manual}"
 
 log_step "$(T "VPN Configuration Backup" "Backup Konfigurasi VPN" "VPN 配置备份") - $(date)"
 
-# Create backup directory
+# Create backup directory first (needed for disk space check below)
 mkdir -p "$BACKUP_DIR"
+
+# v3.1: Check disk space before backup (need at least 100MB free)
+REQUIRED_SPACE_MB=100
+AVAILABLE_SPACE_MB="$(df -BM "$BACKUP_DIR" 2>/dev/null | awk 'NR==2 {print $4}' | tr -d 'M' || true)"
+# Fallback to 0 when parsing fails (non-numeric output)
+[[ "$AVAILABLE_SPACE_MB" =~ ^[0-9]+$ ]] || AVAILABLE_SPACE_MB=0
+
+if [[ "$AVAILABLE_SPACE_MB" -lt "$REQUIRED_SPACE_MB" ]]; then
+  log_error "$(T "Insufficient disk space! Need at least ${REQUIRED_SPACE_MB}MB, only ${AVAILABLE_SPACE_MB}MB available." "Ruang disk tidak cukup! Butuh minimal ${REQUIRED_SPACE_MB}MB, hanya ${AVAILABLE_SPACE_MB}MB tersedia." "磁盘空间不足！至少需要 ${REQUIRED_SPACE_MB}MB，仅有 ${AVAILABLE_SPACE_MB}MB。")"
+  log_warn "$(T "Clean old backups or free up disk space first." "Bersihkan backup lama atau kosongkan ruang disk terlebih dahulu." "请先清理旧备份或释放磁盘空间。")"
+  exit 1
+fi
 
 # Generate backup filename with timestamp
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)

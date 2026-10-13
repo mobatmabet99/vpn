@@ -328,6 +328,34 @@ ls -la /var/backups/vpn
 sudo bash -x ./backup.sh manual
 ```
 
+### Backup Aborted: Insufficient Disk Space (v3.1)
+The backup script checks free space first and aborts when less than 100MB is available:
+```bash
+# Check free space
+df -h /var/backups/vpn
+
+# Remove backups older than 7 days manually
+find /var/backups/vpn -name "vpn_backup_*.tar.gz" -mtime +7 -delete
+
+# Re-run backup
+sudo ./backup.sh manual
+```
+
+### Web Dashboard: 429 Too Many Requests (v3.1)
+Login and user-creation endpoints are rate-limited to prevent brute-force:
+- Login: max 10 attempts per minute per IP
+- Add user/client: max 30 requests per minute per IP
+
+Wait one minute and try again. If you are behind a shared NAT, all users share the same limit.
+
+### Web Dashboard: Invalid Name Error (v3.1)
+User and client names must match `^[a-zA-Z0-9_-]{1,32}$` (letters, numbers, dash, underscore only, max 32 chars).
+Rename the account (e.g. `phone-andi` is valid, `phone andi!` is not) and try again.
+
+### Telegram Bot: Command Timed Out After 120s (v3.1)
+Long operations (first backup, package installs) can take a while. The bot waits up to 120 seconds.
+If it times out, the operation may still be running in the background — check the result with `/start` → Server Status, or run the script manually via SSH.
+
 ---
 
 ## 🔄 Upgrade from v1.4 to v3
