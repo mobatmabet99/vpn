@@ -60,6 +60,8 @@ Address = $srv_v4, $srv_v6
 ListenPort = $port
 PrivateKey = $SERVER_PRIV_KEY
 SaveConfig = false
+# MTU 1420 = 1500 - 80 byte overhead WireGuard (mencegah fragmentasi & lambat)
+MTU = 1420
 
 # NAT & Routing: otomatis diterapkan saat wg0 UP, dibersihkan saat DOWN
 PostUp = iptables -I FORWARD -i %i -j ACCEPT; iptables -I FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -I POSTROUTING -o $iface -j MASQUERADE; ip6tables -I FORWARD -i %i -j ACCEPT; ip6tables -I FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; ip6tables -t nat -I POSTROUTING -o $iface -j MASQUERADE 2>/dev/null || true
@@ -90,9 +92,9 @@ wg_enable_and_start() {
 
 wg_reload_config() {
   if systemctl is-active --quiet wg-quick@wg0; then
-    # Jika wg syncconf tersedia, gunakan tanpa memutus koneksi
+    # Muat ulang tanpa memutus koneksi (strip FILE konfigurasi, bukan nama interface)
     if command -v wg-quick &>/dev/null; then
-      wg syncconf wg0 <(wg-quick strip wg0 2>/dev/null) 2>/dev/null || {
+      wg syncconf wg0 <(wg-quick strip "$WG_CONF" 2>/dev/null) 2>/dev/null || {
         systemctl restart wg-quick@wg0
       }
     else
@@ -209,6 +211,7 @@ EOF
 PrivateKey = $priv_key
 Address = ${CLIENT_IPV4}/32, ${CLIENT_IPV6}/128
 DNS = $dns_list
+MTU = 1420
 
 [Peer]
 PublicKey = $SERVER_PUB_KEY

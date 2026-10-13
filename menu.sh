@@ -46,7 +46,7 @@ EOF
   echo "----------------------------------------------------------------"
   echo " [7]  Instal / Konfigurasi OpenVPN (Opsional)"
   echo " [8]  Instal / Konfigurasi Shadowsocks (Opsional)"
-  echo " [9]  Restart Semua Layanan VPN"
+  echo " [9]  Mulai Ulang Semua Layanan VPN"
   echo " [10] Uninstall / Hapus Bersih VPN dari Server"
   echo " [0]  Keluar"
   echo "================================================================"
@@ -99,19 +99,19 @@ main_loop() {
       8)
         read -rp "Port Shadowsocks [8388]: " ss_p
         ss_p="${ss_p:-8388}"
-        ss_setup_server "$ss_p" "$(gen_password 18)" "aes-256-gcm" "$(get_public_ip)"
+        ss_setup_server "$ss_p" "$(gen_password 18)" "$SS_METHOD_DEFAULT" "$(get_public_ip)"
         pause
         ;;
       9)
-        log_step "Me-restart layanan WireGuard..."
-        systemctl restart wg-quick@wg0 2>/dev/null && log_success "WireGuard di-restart." || log_warn "WireGuard tidak aktif."
+        log_step "Memulai ulang layanan WireGuard..."
+        systemctl restart wg-quick@wg0 2>/dev/null && log_success "WireGuard dimulai ulang." || log_warn "WireGuard tidak aktif."
         if systemctl list-unit-files | grep -qE "openvpn-server@|openvpn@"; then
           systemctl restart openvpn-server@server 2>/dev/null || systemctl restart openvpn@server 2>/dev/null || true
-          log_success "OpenVPN di-restart."
+          log_success "OpenVPN dimulai ulang."
         fi
         if systemctl list-unit-files | grep -q "shadowsocks-rust"; then
           systemctl restart shadowsocks-rust 2>/dev/null || true
-          log_success "Shadowsocks di-restart."
+          log_success "Shadowsocks dimulai ulang."
         fi
         pause
         ;;

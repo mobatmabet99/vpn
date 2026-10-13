@@ -104,7 +104,7 @@ for name in "${CLIENT_NAMES[@]}"; do
   # potong prefix subnet IPv4 saja agar rapi
   ip_short="$(echo "$ip" | cut -d, -f1 | tr -d ' ')"
 
-  last_seen="Offline"
+  last_seen="Belum pernah"
   rx_str="0 B"
   tx_str="0 B"
 

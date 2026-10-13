@@ -173,6 +173,16 @@ main() {
     [[ "$ask_ss" =~ ^[Yy]$ ]] && WITH_SHADOWSOCKS=1 || true
   fi
 
+  # Validasi global (berlaku untuk mode interaktif & non-interaktif)
+  [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] && [[ "$SERVER_PORT" -ge 1 && "$SERVER_PORT" -le 65535 ]] || die "Port '$SERVER_PORT' tidak valid. Gunakan angka 1-65535."
+  validate_client_name "$FIRST_CLIENT"
+  if is_port_in_use "$SERVER_PORT" "udp"; then
+    log_warn "Port UDP $SERVER_PORT sepertinya sudah dipakai oleh aplikasi lain."
+    if [[ "$CLI_YES" -eq 0 ]]; then
+      confirm "Tetap lanjutkan dengan port $SERVER_PORT? [y/N] " || die "Instalasi dibatalkan. Jalankan ulang dengan port lain (mis. --port 51821)."
+    fi
+  fi
+
   SERVER_SUBNET="$DEFAULT_SUBNET"
   SERVER_IP="$DEFAULT_SERVER_IP"
   WG_CONF="/etc/wireguard/wg0.conf"
@@ -213,7 +223,7 @@ main() {
 
   if [[ "$WITH_SHADOWSOCKS" -eq 1 ]]; then
     log_step "Memasang Shadowsocks Server..."
-    ss_setup_server 8388 "$(gen_password 18)" "aes-256-gcm" "$SERVER_PUB_IP"
+    ss_setup_server 8388 "$(gen_password 18)" "$SS_METHOD_DEFAULT" "$SERVER_PUB_IP"
   fi
 
   # 15. Tampilkan QR Code & Petunjuk Akhir

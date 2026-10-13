@@ -107,8 +107,13 @@ push "dhcp-option DNS 1.1.1.1"
 push "dhcp-option DNS 1.0.0.1"
 push "route-ipv6 2000::/3"
 keepalive 10 120
-cipher AES-256-GCM
+# Cipher modern & efisien (urutan prioritas: ChaCha20 untuk CPU tanpa AES-NI,
+# AES-GCM untuk CPU dengan akselerasi hardware). TLS minimal 1.3 + SHA-512.
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
+data-ciphers-fallback AES-256-GCM
+auth SHA512
+tls-version-min 1.3
+tls-cipher TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-ECDSA-WITH-CHACHA20-POLY1305:TLS-ECDHE-RSA-WITH-CHACHA20-POLY1305
 user nobody
 group nogroup
 persist-key
@@ -117,6 +122,10 @@ status /var/log/openvpn-status.log
 verb 3
 explicit-exit-notify 1
 EOF
+  # explicit-exit-notify hanya valid untuk UDP — hapus bila protokol TCP
+  if [[ "$proto" != "udp" ]]; then
+    sed -i '/^explicit-exit-notify/d' "$OVPN_SERVER_DIR/server.conf"
+  fi
 
   # Fix group for RHEL (nobody group is usually nobody)
   if [[ "$OS_FAMILY" == "rhel" ]]; then
@@ -181,8 +190,11 @@ nobind
 persist-key
 persist-tun
 remote-cert-tls server
-cipher AES-256-GCM
+# Wajib selaras dengan server: cipher modern + auth SHA-512 + TLS 1.3
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
+data-ciphers-fallback AES-256-GCM
+auth SHA512
+tls-version-min 1.3
 verb 3
 
 <ca>

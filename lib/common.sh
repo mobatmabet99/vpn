@@ -173,9 +173,10 @@ check_virt() {
 # ------------------------------------------------------------------ network
 get_default_iface() {
   local iface=""
-  iface="$(ip -4 route ls 2>/dev/null | grep -m1 default | grep -oP '(?<=dev )(\S+)' || true)"
+  # Pakai awk (portabel) — grep -P tidak tersedia di semua distro (Alpine, RHEL minimal, dsb.)
+  iface="$(ip -4 route ls 2>/dev/null | awk '/^default/ {for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
   if [[ -z "$iface" ]]; then
-    iface="$(ip route get 1.1.1.1 2>/dev/null | grep -oP '(?<=dev )(\S+)' | head -n1 || true)"
+    iface="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
   fi
   echo "${iface:-eth0}"
 }

@@ -13,6 +13,15 @@ SS_CONFIG_DIR="/etc/shadowsocks"
 SS_CONFIG_FILE="$SS_CONFIG_DIR/config.json"
 SS_PARAMS="/etc/shadowsocks/params"
 
+# Versi stabil shadowsocks-rust (cek terbaru di
+# https://github.com/shadowsocks/shadowsocks-rust/releases).
+# Diperbarui berkala agar koneksi memakai build paling efisien & aman.
+SS_VERSION_DEFAULT="v1.25.0"
+
+# Cipher AEAD default — paling efisien & didukung luas oleh semua client modern.
+# Alternatif hemat CPU untuk perangkat/VM kecil: "2022-blake3-aes-128-gcm".
+SS_METHOD_DEFAULT="2022-blake3-aes-256-gcm"
+
 install_shadowsocks_binary() {
   log_step "Mengunduh dan menyiapkan Shadowsocks-rust server..."
 
@@ -29,8 +38,9 @@ install_shadowsocks_binary() {
   mkdir -p "$SS_CONFIG_DIR" /usr/local/bin
   chmod 700 "$SS_CONFIG_DIR"
 
+  SS_VER_LABEL="${SS_VERSION:-$SS_VERSION_DEFAULT}"
   if ! command -v ssserver &>/dev/null; then
-    local ss_ver="v1.22.0"
+    local ss_ver="$SS_VER_LABEL"
     local ss_url="https://github.com/shadowsocks/shadowsocks-rust/releases/download/${ss_ver}/shadowsocks-${ss_ver}.${target_arch}.tar.xz"
 
     log_info "Mengunduh shadowsocks-rust ($ss_ver) dari GitHub..."
@@ -59,7 +69,7 @@ install_shadowsocks_binary() {
 ss_setup_server() {
   local port="${1:-8388}"
   local password="${2:-$(gen_password 20)}"
-  local method="${3:-aes-256-gcm}"
+  local method="${3:-$SS_METHOD_DEFAULT}"
   local pub_ip="${4:-$(get_public_ip)}"
 
   install_shadowsocks_binary

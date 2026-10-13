@@ -18,6 +18,13 @@ enable_ip_forwarding() {
 # Diaktifkan otomatis untuk VPN
 net.ipv4.ip_forward = 1
 net.ipv6.conf.all.forwarding = 1
+# Optimasi throughput VPN (BBR-friendly, aman untuk semua kernel modern)
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.core.rmem_max = 26214400
+net.core.wmem_max = 26214400
+net.ipv4.tcp_rmem = 4096 87380 26214400
+net.ipv4.tcp_wmem = 4096 65536 26214400
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
 net.ipv4.conf.all.accept_redirects = 0
@@ -86,7 +93,6 @@ install_wireguard_packages() {
         resolvconf
       )
 
-      # iptables-persistent jika tersedia
       apt-get install -y "${pkgs[@]}" || {
         # Fallback tanpa wireguard meta-package jika di kernel lama butuh dkms
         log_warn "Instalasi standard gagal, mencoba dengan wireguard-dkms..."

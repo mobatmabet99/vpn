@@ -2,7 +2,7 @@
 
 Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** dengan opsi tambahan **OpenVPN** dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
 
-> Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — upload / clone repo ini ke server Linux Anda.
+> Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — clone repo ini ke server Linux Anda.
 
 ---
 
@@ -10,11 +10,12 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** dengan ops
 
 | Fitur | Detail |
 |---|---|
-| 🔌 **Protokol utama** | WireGuard (modern, cepat, aman) dengan auto-generate keypair server + client, Pre-Shared Key (PSK), file `.conf` client & QR Code (PNG + ANSI terminal) |
-| 🔌 **Protokol opsional** | OpenVPN (port 1194/UDP + profil `.ovpn`) dan Shadowsocks (AEAD `aes-256-gcm` + URI `ss://` + QR) |
+| 🔌 **Protokol utama** | WireGuard (ChaCha20-Poly1305, MTU 1420) dengan auto-generate keypair server + client, Pre-Shared Key (PSK), file `.conf` client & QR Code (PNG + ANSI terminal) |
+| 🔌 **Protokol opsional** | OpenVPN 2.7/2.6 stabil (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) dan Shadowsocks-rust v1.25.0 (cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR) |
 | 🖥️ **Dukungan OS** | Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS, Debian 10 / 11 / 12 / 13, CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora |
 | 🛡️ **Firewall otomatis** | Membuka port VPN di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
+| 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
 | 📦 **Modular** | Kode dipisah: `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `status.sh`, `menu.sh`, `uninstall.sh`, plus library di `lib/` |
 | ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client, backup konfigurasi lama |
@@ -73,7 +74,7 @@ File konfigurasi yang dihasilkan di server:
 ### 1. Clone repository ke server Linux
 
 ```bash
-git clone https://github.com/<username-anda>/vpn.git
+git clone https://github.com/mobatmabet99/vpn.git
 cd vpn
 chmod +x *.sh
 ```
@@ -113,18 +114,19 @@ Lihat semua opsi:
 ### 3. Apa yang dilakukan `install.sh` secara berurutan
 
 1. Validasi root & keberadaan `/dev/net/tun`.
-2. Deteksi OS (Ubuntu/Debian/RHEL/...) — menolak lanjut jika distro asing kecuali dipaksa.
+2. Deteksi OS (Ubuntu/Debian/RHEL/...) — distro asing diberi peringatan dan diminta konfirmasi, kecuali dipaksa.
 3. Deteksi interface jaringan utama & IP publik server.
-4. Instal paket: `wireguard`, `wireguard-tools`, `iptables`, `qrencode`, `curl`, `iproute2`.
-5. Aktifkan IP forwarding IPv4 (+ IPv6 bila tersedia).
-6. Buka port UDP di UFW / firewalld.
-7. Generate server keypair WireGuard (`wg genkey | wg pubkey`).
-8. Tulis `/etc/wireguard/wg0.conf` lengkap dengan aturan NAT `PostUp`/`PostDown`.
-9. Simpan `/etc/wireguard/params` untuk dipakai skrip lain.
-10. Buat client pertama + file `.conf` + QR Code (PNG & tampil di terminal).
-11. Enable & start `wg-quick@wg0` via systemd.
-12. (Opsional) Setup OpenVPN / Shadowsocks bila diminta.
-13. Tampilkan ringkasan + QR code client pertama.
+4. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
+5. Instal paket: `wireguard`, `wireguard-tools`, `iptables`, `qrencode`, `curl`, `iproute2`.
+6. Aktifkan IP forwarding IPv4 (+ IPv6 bila tersedia) beserta optimasi throughput (BBR, buffer TCP).
+7. Buka port UDP di UFW / firewalld.
+8. Generate server keypair WireGuard (`wg genkey | wg pubkey`).
+9. Tulis `/etc/wireguard/wg0.conf` (MTU 1420) lengkap dengan aturan NAT `PostUp`/`PostDown`.
+10. Simpan `/etc/wireguard/params` untuk dipakai skrip lain.
+11. Buat client pertama + file `.conf` + QR Code (PNG & tampil di terminal).
+12. Enable & start `wg-quick@wg0` via systemd.
+13. (Opsional) Setup OpenVPN / Shadowsocks bila diminta.
+14. Tampilkan ringkasan + QR code client pertama.
 
 ### 4. Alternatif: pakai menu interaktif
 
@@ -132,7 +134,7 @@ Lihat semua opsi:
 sudo ./menu.sh
 ```
 
-Menu berisi: instal, tambah/hapus client, tampil QR, daftar client, cek status, instal OpenVPN/Shadowsocks, restart service, uninstall.
+Menu berisi: instal, tambah/hapus client, tampil QR, daftar client, cek status, instal OpenVPN/Shadowsocks, mulai ulang service, uninstall.
 
 ---
 
@@ -189,7 +191,7 @@ sudo ./show-qr.sh hp-andi
 # Diagnostik server (service, forwarding, TUN, NAT, firewall)
 sudo ./status.sh
 
-# Restart layanan WireGuard manual
+# Mulai ulang layanan WireGuard manual
 sudo systemctl restart wg-quick@wg0
 sudo wg show   # lihat handshake & transfer per peer
 
@@ -204,6 +206,7 @@ sudo ./uninstall.sh
 - **Kunci kriptografi:** setiap client punya keypair Curve25519 unik + Pre-Shared Key (PSK) untuk hardening terhadap serangan quantum.
 - **File sensitif** (`wg0.conf`, `params`, private key) diset permission `600`, direktori `700`.
 - **Server config** memakai `SaveConfig = false` agar edit manual via skrip tidak tertimpa.
+- **MTU 1420** di server & client (1500 − 80 byte overhead WireGuard) untuk mencegah fragmentasi.
 - **NAT/Masquerade** di-`PostUp` saat `wg0` naik:
   ```bash
   iptables -I FORWARD -i %i -j ACCEPT
@@ -225,7 +228,7 @@ sudo ./uninstall.sh
 | `/dev/net/tun tidak tersedia` | VPS OpenVZ/LXC tanpa TUN. Aktifkan TUN di panel provider, atau pindah ke VPS KVM. |
 | `wg-quick@wg0 gagal berjalan` | Lihat log: `journalctl -u wg-quick@wg0 -n 50 --no-pager`. Umumnya karena port bentrok — ganti port saat instalasi. |
 | Client connect tapi tidak bisa internet | Pastikan forwarding aktif (`cat /proc/sys/net/ipv4/ip_forward` harus `1`), cek NAT (`iptables -t nat -L -n`), dan pastikan firewall cloud provider membuka port UDP. |
-| `Port sudah dipakai` | Cek dengan `ss -lnup \| grep 51820`, pilih port lain via `./install.sh --port 51821`. |
+| `Port sudah dipakai` | Instalasi otomatis memberi peringatan — cek dengan `ss -lnup \| grep 51820`, pilih port lain via `./install.sh --port 51821`. |
 | QR tidak tampil di terminal | Terminal tidak dukung ANSI-UTF8 — gunakan file PNG di `/etc/wireguard/clients/<nama>/`. |
 | OS baru (mis. Ubuntu 26 / Debian 13) diperingatkan "belum teruji" | Lanjut dengan `y`, atau set `FORCE_OS=1`. Laporkan hasilnya via Issues agar daftar resmi diperbarui. |
 
@@ -236,6 +239,8 @@ sudo ./uninstall.sh
 - **Ganti port default:** edit `DEFAULT_PORT` di `install.sh`, atau instal dengan `--port <nomor>`.
 - **Ganti subnet VPN:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` di `install.sh` dan `base_v4`/`base_v6` di `lib/wireguard.sh` (pastikan konsisten di `wg_write_server_conf` dan `wg_get_next_ip`).
 - **Ganti DNS default:** edit `DEFAULT_DNS` di `install.sh`.
+- **Ganti versi Shadowsocks:** edit `SS_VERSION_DEFAULT` di `lib/shadowsocks.sh` (default: `v1.25.0`, cek rilis terbaru di [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
+- **Ganti cipher Shadowsocks:** edit `SS_METHOD_DEFAULT` di `lib/shadowsocks.sh` (default AEAD-2022 `2022-blake3-aes-256-gcm`; hemat CPU: `2022-blake3-aes-128-gcm`).
 - **Nonaktifkan IPv6 client:** hapus `, ::/0` dari `AllowedIPs` saat generate profil (atau edit manual file `.conf` client).
 
 ---
