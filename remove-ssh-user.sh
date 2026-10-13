@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/ssh.sh
 source "$SCRIPT_DIR/lib/ssh.sh"
+# shellcheck source=lib/limits.sh
+source "$SCRIPT_DIR/lib/limits.sh"
 
 need_root
 
@@ -36,6 +38,7 @@ if [[ "${AUTO_YES:-0}" != "1" ]]; then
 fi
 
 ssh_remove_user "$USERNAME"
+limits_remove "$USERNAME"
 
 echo ""
 log_success "Akun SSH '$USERNAME' berhasil dihapus."

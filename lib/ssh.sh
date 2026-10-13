@@ -26,7 +26,10 @@ install_ssh_packages() {
   case "$PKG_MGR" in
     apt)
       apt-get update -y || true
-      apt-get install -y openssh-server dropbear stunnel4 python3 curl qrencode iptables
+      # Debian 13 (trixie) & Ubuntu 26.04: dropbear + stunnel4 masih tersedia di repo main.
+      # unzip ditambah untuk ekstraksi Xray yang andal (fallback python3-zip tetap ada).
+      apt-get install -y openssh-server dropbear stunnel4 python3 curl qrencode iptables unzip || \
+        apt-get install -y openssh-server stunnel4 python3 curl qrencode iptables unzip
       ;;
     dnf|yum)
       $PKG_MGR install -y epel-release || true

@@ -129,4 +129,16 @@ if [[ -f /etc/sysctl.d/99-vpn-forward.conf ]]; then
   rm -f /etc/sysctl.d/99-vpn-forward.conf
 fi
 
+# 9. Hentikan & bersihkan monitor limit (wrwb Store)
+if systemctl list-unit-files 2>/dev/null | grep -q "^vpn-limits\\.service"; then
+  log_step "Membersihkan monitor limit IP & bandwidth..."
+  systemctl stop vpn-limits 2>/dev/null || true
+  systemctl disable vpn-limits 2>/dev/null || true
+  rm -f /etc/systemd/system/vpn-limits.service /usr/local/bin/vpn-limits-monitor.sh
+  rm -rf /usr/local/share/vpn-libs /var/lib/vpn-limits
+  systemctl daemon-reload 2>/dev/null || true
+  log_success "Monitor limit dibersihkan."
+fi
+
 log_success "Uninstalasi VPN selesai. Sistem telah dikembalikan ke kondisi semula."
+echo "Dibuat oleh wrwb Store"

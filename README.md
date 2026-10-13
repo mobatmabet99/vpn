@@ -1,8 +1,14 @@
 # VPN Auto-Installer — Multi-Protokol Linux (WireGuard + SSH + Xray + OpenVPN + Shadowsocks)
 
+> Dibuat oleh **wrwb Store** — Limit default 2 IP & 100 GB, auto-suspend 5 menit jika multi-login.
+
 Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai mesin utama, dengan **SSH VPN** dan **Xray-core** terpasang **secara default**, plus opsi **OpenVPN**, **v2ray-core**, dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
 
 > Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — clone repo ini ke server Linux Anda.
+>
+> **Baru di v1.2:** setiap akun baru menanyakan **Limit IP** dan **Limit Bandwidth**
+> (default **2 IP** & **100 GB/bulan** bila di-skip). Multi-login melebihi limit =
+> **auto-suspend 5 menit + auto-clear sesi**. Detail: [CHANGELOG-v1.2.md](CHANGELOG-v1.2.md).
 
 ---
 
@@ -20,8 +26,9 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
-| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `status.sh`, `menu.sh`, `uninstall.sh`, plus library di `lib/` |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-16), `uninstall.sh`, plus library di `lib/` (termasuk `lib/limits.sh`) |
 | ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client/user, backup konfigurasi lama |
+| ⏱️ **Limit & suspend (v1.2)** | Limit IP concurrent + bandwidth GB/bulan per akun (default 2 IP & 100 GB). Multi-login > limit = auto-suspend 5 menit + auto-clear sesi. Monitor systemd `vpn-limits` tiap 60 detik |
 
 ---
 
@@ -30,23 +37,26 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 ```
 vpn/
 ├── install.sh              # Instalasi: WireGuard + SSH + Xray (default ON)
-├── add-client.sh           # Tambah client WireGuard baru
-├── remove-client.sh        # Hapus client WireGuard
+├── add-client.sh           # Tambah client WireGuard baru (tanya limit IP & bandwidth)
+├── remove-client.sh        # Hapus client WireGuard (+ bersihkan data limit)
 ├── list-clients.sh         # Daftar client WG + statistik trafik & handshake
 ├── show-qr.sh              # Tampilkan ulang QR Code / .conf client WG
-├── add-ssh-user.sh         # Buat akun SSH VPN (dengan masa berlaku)
-├── remove-ssh-user.sh      # Hapus akun SSH VPN
-├── add-xray-user.sh        # Buat user Xray/V2Ray (semua inbound sekaligus)
-├── remove-xray-user.sh     # Hapus user Xray/V2Ray
-├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall
-├── menu.sh                 # Menu interaktif 0-15 (panel kontrol)
-├── uninstall.sh            # Hapus bersih seluruh instalasi VPN
+├── add-ssh-user.sh         # Buat akun SSH VPN (masa berlaku + limit IP & bandwidth)
+├── remove-ssh-user.sh      # Hapus akun SSH VPN (+ bersihkan data limit)
+├── add-xray-user.sh        # Buat user Xray/V2Ray + limit IP & bandwidth
+├── remove-xray-user.sh     # Hapus user Xray/V2Ray (+ bersihkan data limit)
+├── check-limits.sh         # Lihat limit IP, kuota, IP aktif & status suspend
+├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall, limit
+├── menu.sh                 # Menu interaktif 0-16 (panel kontrol wrwb Store)
+├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit)
+├── CHANGELOG-v1.2.md       # Catatan rilis v1.2 (limit IP & bandwidth)
 ├── lib/
 │   ├── common.sh           # Logging, deteksi OS, validasi, helper jaringan, params
 │   ├── system.sh           # Instal paket, IP forwarding, firewall (UFW/firewalld)
 │   ├── wireguard.sh        # Inti WireGuard: server conf, alokasi IP, CRUD client
 │   ├── ssh.sh              # Modul SSH: OpenSSH+Dropbear+Stunnel+WebSocket, CRUD akun
 │   ├── xray.sh             # Modul Xray/V2Ray: VMess/VLESS/Trojan+XTLS/REALITY
+│   ├── limits.sh           # Modul v1.2: limit IP & bandwidth + auto-suspend 5 menit
 │   ├── openvpn.sh          # Modul alternatif OpenVPN + Easy-RSA
 │   └── shadowsocks.sh      # Modul opsional Shadowsocks-rust
 ├── README.md
@@ -168,8 +178,9 @@ Menu 0–15: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek st
 ## 👤 WireGuard — Tambah / Hapus Client
 
 ```bash
-sudo ./add-client.sh                 # interaktif
-sudo ./add-client.sh hp-andi         # langsung
+sudo ./add-client.sh                 # interaktif (tanya limit IP & bandwidth)
+sudo ./add-client.sh hp-andi         # langsung (limit default 2 IP / 100 GB)
+sudo ./add-client.sh hp-andi 3 200   # langsung (limit 3 IP / 200 GB)
 sudo ./remove-client.sh hp-andi      # hapus (peer dihapus live + IP dipakai ulang)
 sudo ./list-clients.sh               # daftar + handshake terakhir + trafik up/down
 sudo ./show-qr.sh hp-andi            # tampilkan ulang QR + .conf
@@ -187,9 +198,10 @@ Aturan nama: huruf, angka, `-`, `_` saja, maksimal 32 karakter.
 Layanan default kedua setelah WireGuard. Port: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS **80**.
 
 ```bash
-sudo ./add-ssh-user.sh                    # interaktif (password kosong = auto-generate)
-sudo ./add-ssh-user.sh andi               # password acak, berlaku 30 hari
+sudo ./add-ssh-user.sh                    # interaktif (tanya limit IP & bandwidth)
+sudo ./add-ssh-user.sh andi               # password acak, berlaku 30 hari (limit default)
 sudo ./add-ssh-user.sh andi 'R4h4s1a!' 90 # password sendiri, berlaku 90 hari
+sudo ./add-ssh-user.sh andi '' 30 3 200   # limit 3 IP / 200 GB
 sudo ./remove-ssh-user.sh andi            # hapus (sesi aktif ikut dimatikan)
 ```
 
@@ -216,13 +228,39 @@ Satu user = 1 UUID yang langsung aktif di **semua 5 inbound**:
 | 5 | Trojan + WebSocket (`/trojan`) | 10003 | Samaran trafik HTTPS |
 
 ```bash
-sudo ./add-xray-user.sh hp-andi       # buat user + cetak 5 link + QR REALITY
+sudo ./add-xray-user.sh hp-andi       # buat user + cetak 5 link + QR REALITY (limit default)
+sudo ./add-xray-user.sh hp-andi 3 200 # buat user dengan limit 3 IP / 200 GB
 sudo ./remove-xray-user.sh hp-andi    # hapus dari semua inbound
 ```
 
 Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas: **VLESS REALITY > VLESS XTLS > VMess/VLESS/Trojan WS**. Salin link diawali `vless://...security=reality...` untuk hasil terbaik.
 
 Ganti engine default (`xray` → `v2ray`) saat instal: `sudo ./install.sh --with-v2ray --yes` atau `XRAY_ENGINE=v2ray sudo ./install.sh --yes`.
+
+---
+
+## ⏱️ Limit IP & Bandwidth — Auto-Suspend 5 Menit (v1.2, wrwb Store)
+
+Setiap akun baru menanyakan **Limit IP concurrent** dan **Limit Bandwidth
+(GB/bulan)**. Kosongkan jawaban = default **2 IP** & **100 GB**.
+
+```bash
+sudo ./check-limits.sh          # tabel semua user: limit, kuota terpakai, IP aktif, status
+sudo ./check-limits.sh hp-andi  # cek satu user saja
+```
+
+Aturan main:
+
+- Monitor systemd `vpn-limits` berjalan tiap **60 detik**, menghitung **IP unik
+  aktif** per user (SSH via `who`/`ss`, WireGuard via endpoint aktif, Xray via
+  access log) dalam jendela 10 menit.
+- Jika IP aktif **melebihi limit** → user di-**suspend 5 menit** (300 detik),
+  semua sesi di database **dibersihkan**, dan proses SSH user dimatikan.
+- Setelah 5 menit, suspend kedaluwarsa **otomatis** + sesi dibersihkan lagi,
+  sehingga login berikutnya dihitung dari nol (benar).
+- Pemakaian bandwidth WireGuard dikumpulkan otomatis dari `wg show` dan
+  di-reset tiap awal bulan. Status `OVER-KUOTA` tampil di `check-limits.sh`.
+- Menghapus akun (`remove-*.sh`) otomatis menghapus data limitnya.
 
 ---
 
@@ -287,6 +325,7 @@ sudo ./uninstall.sh
 - **Ganti versi Shadowsocks:** edit `SS_VERSION_DEFAULT` di `lib/shadowsocks.sh` (default: `v1.25.0`, cek [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
 - **Ganti cipher Shadowsocks:** edit `SS_METHOD_DEFAULT` di `lib/shadowsocks.sh` (default AEAD-2022 `2022-blake3-aes-256-gcm`; hemat CPU: `2022-blake3-aes-128-gcm`).
 - **Nonaktifkan IPv6 client:** hapus `, ::/0` dari `AllowedIPs` saat generate profil (atau edit manual file `.conf` client).
+- **Ganti default limit:** edit `DEFAULT_MAX_IP` (2) / `DEFAULT_MAX_GB` (100) di `lib/limits.sh`; durasi suspend via `SUSPEND_SECONDS_DEFAULT` (300 = 5 menit).
 
 ---
 
@@ -303,3 +342,6 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 ## 📄 Lisensi
 
 Bebas digunakan untuk keperluan pribadi maupun komersial. Disediakan "sebagaimana adanya" tanpa garansi. Pastikan kepatuhan terhadap hukum/ToS provider jaringan Anda saat menjalankan layanan VPN.
+
+---
+Dibuat oleh **wrwb Store** — v1.2 (Limit 2 IP & 100 GB, auto-suspend 5 menit).

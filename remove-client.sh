@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/wireguard.sh
 source "$SCRIPT_DIR/lib/wireguard.sh"
+# shellcheck source=lib/limits.sh
+source "$SCRIPT_DIR/lib/limits.sh"
 
 need_root
 load_params
@@ -71,6 +73,7 @@ if [[ "${AUTO_YES:-0}" != "1" ]]; then
 fi
 
 wg_remove_client "$CLIENT_NAME"
+limits_remove "$CLIENT_NAME"
 
 echo ""
 log_success "Client '$CLIENT_NAME' berhasil dihapus dari server."

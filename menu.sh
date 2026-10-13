@@ -37,6 +37,7 @@ show_menu() {
       |_| \_\\___/ \___/  |_| |_____|_| \_\  |_|  |_|_____|_| \_|\___/ 
                                                                        
         Panel Kontrol & Manajemen VPN Multi-Protokol Linux
+        Dibuat oleh wrwb Store
  ================================================================
 EOF
   echo " Status WireGuard: $(systemctl is-active wg-quick@wg0 2>/dev/null || echo 'Belum aktif')"
@@ -57,8 +58,10 @@ EOF
   echo " [13] Kelola User Xray/V2Ray (tambah/hapus/daftar)"
   echo " [14] Mulai Ulang Semua Layanan VPN"
   echo " [15] Uninstall / Hapus Bersih VPN dari Server"
+  echo " [16] Cek Limit IP & Bandwidth (wrwb Store)"
   echo " [0]  Keluar"
   echo "================================================================"
+  echo " Dibuat oleh wrwb Store"
 }
 
 pause() {
@@ -69,7 +72,7 @@ pause() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "Pilih menu [0-15]: " choice
+    read -rp "Pilih menu [0-16]: " choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -185,6 +188,10 @@ main_loop() {
         ;;
       15)
         "$SCRIPT_DIR/uninstall.sh"
+        pause
+        ;;
+      16)
+        "$SCRIPT_DIR/check-limits.sh"
         pause
         ;;
       0)

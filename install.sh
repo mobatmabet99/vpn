@@ -27,6 +27,8 @@ source "$SCRIPT_DIR/lib/shadowsocks.sh"
 source "$SCRIPT_DIR/lib/ssh.sh"
 # shellcheck source=lib/xray.sh
 source "$SCRIPT_DIR/lib/xray.sh"
+# shellcheck source=lib/limits.sh
+source "$SCRIPT_DIR/lib/limits.sh"
 
 # Default Konfigurasi
 DEFAULT_PORT="51820"
@@ -46,6 +48,7 @@ print_banner() {
        \_/  |_|   |_| \_|  |___|_| |_|___/\__\__,_|_|_|\___|_|   
                                                                  
     Otomatisasi Instalasi VPN Multi-Distro (WireGuard Engine)
+    Dibuat oleh wrwb Store - Limit 2 IP & 100GB Default
  ================================================================
 EOF
 }
@@ -289,6 +292,11 @@ main() {
     log_step "Memasang Shadowsocks Server..."
     ss_setup_server 8388 "$(gen_password 18)" "$SS_METHOD_DEFAULT" "$SERVER_PUB_IP"
   fi
+
+  # 14b. Daftarkan limit default client pertama + pasang monitor (wrwb Store)
+  limits_set "$FIRST_CLIENT" "2" "100"
+  log_info "Limit default '$FIRST_CLIENT': 2 IP concurrent, 100 GB/bulan."
+  limits_install_monitor_service
 
   # 15. Tampilkan QR Code & Petunjuk Akhir
   echo ""

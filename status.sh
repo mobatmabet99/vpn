@@ -140,4 +140,24 @@ else
   echo -e "${_C_YELLOW}[BELUM ADA ATAU MENUNGGU INTERFACE UP]${_C_RESET}"
 fi
 
+# 6. Limit IP & Bandwidth (wrwb Store)
+echo "--------------------------------------------------------------------------------"
+echo -e "${_C_BOLD}LIMIT IP & BANDWIDTH (wrwb Store):${_C_RESET}"
+if systemctl list-unit-files 2>/dev/null | grep -q "^vpn-limits\\.service"; then
+  if systemctl is-active --quiet vpn-limits 2>/dev/null; then
+    echo -e "Monitor Service       : ${_C_GREEN}[ACTIVE]${_C_RESET} (cek tiap 60 detik)"
+  else
+    echo -e "Monitor Service       : ${_C_YELLOW}[INACTIVE]${_C_RESET}"
+  fi
+else
+  echo -e "Monitor Service       : ${_C_YELLOW}[BELUM TERPASANG]${_C_RESET}"
+fi
+if [[ -f /var/lib/vpn-limits/limits.db ]]; then
+  echo "User terdaftar limit  : $(grep -c . /var/lib/vpn-limits/limits.db 2>/dev/null || echo 0)"
+fi
+if [[ -f /var/lib/vpn-limits/suspended.db && -s /var/lib/vpn-limits/suspended.db ]]; then
+  echo -e "User di-suspend       : ${_C_RED}$(cut -d: -f1 /var/lib/vpn-limits/suspended.db | tr '\n' ' ')${_C_RESET}"
+fi
+
 echo "================================================================================"
+echo " Dibuat oleh wrwb Store"

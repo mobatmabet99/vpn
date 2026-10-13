@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/xray.sh
 source "$SCRIPT_DIR/lib/xray.sh"
+# shellcheck source=lib/limits.sh
+source "$SCRIPT_DIR/lib/limits.sh"
 
 need_root
 
@@ -33,6 +35,7 @@ if [[ "${AUTO_YES:-0}" != "1" ]]; then
 fi
 
 xray_remove_user "$USERNAME"
+limits_remove "$USERNAME"
 
 echo ""
 log_success "User Xray '$USERNAME' berhasil dihapus."
