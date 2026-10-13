@@ -1,6 +1,6 @@
-# VPN Auto-Installer — WireGuard Multi-Distro Linux
+# VPN Auto-Installer — Multi-Protokol Linux (WireGuard + SSH + Xray + OpenVPN + Shadowsocks)
 
-Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** dengan opsi tambahan **OpenVPN** dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
+Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai mesin utama, dengan **SSH VPN** dan **Xray-core** terpasang **secara default**, plus opsi **OpenVPN**, **v2ray-core**, dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
 
 > Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — clone repo ini ke server Linux Anda.
 
@@ -11,14 +11,17 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** dengan ops
 | Fitur | Detail |
 |---|---|
 | 🔌 **Protokol utama** | WireGuard (ChaCha20-Poly1305, MTU 1420) dengan auto-generate keypair server + client, Pre-Shared Key (PSK), file `.conf` client & QR Code (PNG + ANSI terminal) |
-| 🔌 **Protokol opsional** | OpenVPN 2.7/2.6 stabil (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) dan Shadowsocks-rust v1.25.0 (cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR) |
+| 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket (port 80). Manajemen akun: `add-ssh-user.sh` / `remove-ssh-user.sh` (dengan masa berlaku) |
+| ⚡ **Xray-core (default ON)** | v26.3.27 stabil — 5 inbound sekaligus: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis |
+| 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
+| 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
 | 🖥️ **Dukungan OS** | Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS, Debian 10 / 11 / 12 / 13, CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora |
-| 🛡️ **Firewall otomatis** | Membuka port VPN di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
+| 🛡️ **Firewall otomatis** | Membuka semua port VPN (UDP + TCP) di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
-| 📦 **Modular** | Kode dipisah: `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `status.sh`, `menu.sh`, `uninstall.sh`, plus library di `lib/` |
-| ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client, backup konfigurasi lama |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `status.sh`, `menu.sh`, `uninstall.sh`, plus library di `lib/` |
+| ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client/user, backup konfigurasi lama |
 
 ---
 
@@ -26,35 +29,47 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** dengan ops
 
 ```
 vpn/
-├── install.sh          # Instalasi server WireGuard (+ opsi OpenVPN/Shadowsocks)
-├── add-client.sh       # Tambah client WireGuard baru
-├── remove-client.sh    # Hapus client WireGuard
-├── list-clients.sh     # Daftar client + statistik trafik & handshake terakhir
-├── show-qr.sh          # Tampilkan ulang QR Code / .conf client
-├── status.sh           # Diagnostik: service, forwarding, TUN, NAT, firewall
-├── menu.sh             # Menu interaktif (panel kontrol)
-├── uninstall.sh        # Hapus bersih seluruh instalasi VPN
+├── install.sh              # Instalasi: WireGuard + SSH + Xray (default ON)
+├── add-client.sh           # Tambah client WireGuard baru
+├── remove-client.sh        # Hapus client WireGuard
+├── list-clients.sh         # Daftar client WG + statistik trafik & handshake
+├── show-qr.sh              # Tampilkan ulang QR Code / .conf client WG
+├── add-ssh-user.sh         # Buat akun SSH VPN (dengan masa berlaku)
+├── remove-ssh-user.sh      # Hapus akun SSH VPN
+├── add-xray-user.sh        # Buat user Xray/V2Ray (semua inbound sekaligus)
+├── remove-xray-user.sh     # Hapus user Xray/V2Ray
+├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall
+├── menu.sh                 # Menu interaktif 0-15 (panel kontrol)
+├── uninstall.sh            # Hapus bersih seluruh instalasi VPN
 ├── lib/
-│   ├── common.sh       # Logging, deteksi OS, validasi, helper jaringan, params
-│   ├── system.sh       # Instal paket, IP forwarding, firewall (UFW/firewalld)
-│   ├── wireguard.sh    # Inti WireGuard: server conf, alokasi IP, CRUD client
-│   ├── openvpn.sh      # Modul opsional OpenVPN + Easy-RSA
-│   └── shadowsocks.sh  # Modul opsional Shadowsocks-rust
+│   ├── common.sh           # Logging, deteksi OS, validasi, helper jaringan, params
+│   ├── system.sh           # Instal paket, IP forwarding, firewall (UFW/firewalld)
+│   ├── wireguard.sh        # Inti WireGuard: server conf, alokasi IP, CRUD client
+│   ├── ssh.sh              # Modul SSH: OpenSSH+Dropbear+Stunnel+WebSocket, CRUD akun
+│   ├── xray.sh             # Modul Xray/V2Ray: VMess/VLESS/Trojan+XTLS/REALITY
+│   ├── openvpn.sh          # Modul alternatif OpenVPN + Easy-RSA
+│   └── shadowsocks.sh      # Modul opsional Shadowsocks-rust
 ├── README.md
-└── .gitattributes      # Memaksa LF endings agar skrip aman di Linux
+└── .gitattributes          # Memaksa LF endings agar skrip aman di Linux
 ```
 
 File konfigurasi yang dihasilkan di server:
 
 ```
-/etc/wireguard/wg0.conf            # Konfigurasi server
-/etc/wireguard/params              # Parameter server (IP publik, port, DNS, ...)
-                                     # (di-source oleh add/remove client)
+/etc/wireguard/wg0.conf            # Konfigurasi server WireGuard
+/etc/wireguard/params              # Parameter server (di-source skrip WG lain)
 /etc/wireguard/clients/<nama>/
     ├── <nama>.conf                # Profil client (import ke aplikasi WireGuard)
     ├── <nama>.png                 # QR code (untuk HP/tablet)
-    ├── private.key / public.key
-    └── preshared.key
+    └── private.key / public.key / preshared.key
+/etc/ssh-vpn/params                # Port SSH/Dropbear/TLS/WS + IP publik
+/etc/ssh-vpn/accounts.db           # Database akun SSH (user:dibuat:kedaluwarsa)
+/etc/xray/config.json              # Konfigurasi Xray/V2Ray (5 inbound)
+```
+
+```
+/etc/xray/params                   # UUID server, kunci REALITY, port inbound
+/etc/xray/accounts.db              # Database user Xray (nama:uuid:dibuat)
 ```
 
 ---
@@ -64,8 +79,9 @@ File konfigurasi yang dihasilkan di server:
 1. **Server Linux** (VPS direkomendasikan) dengan salah satu OS yang didukung.
 2. **Akses root** — semua skrip harus dijalankan sebagai root / via `sudo`.
 3. **Perangkat TUN** tersedia (`/dev/net/tun`). Hampir semua VPS KVM sudah aktif. Untuk OpenVZ/LXC, aktifkan TUN di panel provider dulu.
-4. **Koneksi internet** di server untuk download paket (apt/dnf) dan deteksi IP publik.
-5. **Port UDP 51820** (default WireGuard) belum dipakai aplikasi lain dan terbuka di firewall cloud provider (contoh: Security Group AWS, Firewall DigitalOcean, dsb).
+4. **Koneksi internet** di server untuk download paket (apt/dnf) dan binary GitHub (Xray/Shadowsocks).
+5. **Port bebas & terbuka** di firewall cloud provider: UDP 51820 (WireGuard), TCP 22/80/143/444 (SSH), TCP 443/10001-10004 (Xray).
+6. **Python 3** di server (umumnya sudah bawaan; dipakai modul Xray untuk edit JSON aman).
 
 ---
 
@@ -81,28 +97,32 @@ chmod +x *.sh
 
 ### 2. Jalankan installer sebagai root
 
-Mode interaktif (ditanya port, DNS, nama client, opsi OpenVPN/Shadowsocks):
+Mode interaktif — Anda memilih layanan login (SSH/OpenVPN, **default: SSH**) dan engine tunnel (Xray/V2Ray, **default: Xray**):
 
 ```bash
 sudo ./install.sh
 ```
 
-Mode non-interaktif (langsung pakai default, cocok untuk automation):
+Mode non-interaktif — langsung default penuh (**WireGuard + SSH + Xray**, cocok untuk automation):
 
 ```bash
 sudo ./install.sh --yes
 ```
 
-Dengan parameter kustom:
+Varian non-interaktif lain:
 
 ```bash
-sudo ./install.sh --port 51820 --client hp-utama --dns "1.1.1.1, 1.0.0.1" --yes
-```
+# WireGuard + OpenVPN + V2Ray (tanpa SSH & Xray)
+sudo ./install.sh --with-openvpn --with-v2ray --yes
 
-Sekaligus pasang OpenVPN + Shadowsocks:
+# Default + Shadowsocks sekalian
+sudo ./install.sh --with-shadowsocks --yes
 
-```bash
-sudo ./install.sh --with-openvpn --with-shadowsocks --yes
+# Minimalis: hanya WireGuard
+sudo ./install.sh --no-ssh --no-xray --yes
+
+# Pilih engine via environment variable
+XRAY_ENGINE=v2ray sudo ./install.sh --yes
 ```
 
 Lihat semua opsi:
@@ -111,22 +131,29 @@ Lihat semua opsi:
 ./install.sh --help
 ```
 
+| Flag | Efek |
+|---|---|
+| `--with-ssh` / `--no-ssh` | Pasang / jangan pasang SSH VPN (default: pasang) |
+| `--with-openvpn` | Pasang OpenVPN **pengganti** SSH (saling eksklusif, bisa dikombinasi manual) |
+| `--with-xray` / `--with-v2ray` / `--no-xray` | Pilih engine tunnel (default: Xray). `--with-v2ray` = engine v2ray-core |
+| `--with-shadowsocks` | Tambah Shadowsocks sekalian (default: tidak) |
+| `-p/-c/-d/-y` | Port WG, nama client pertama, DNS, mode non-interaktif |
+
 ### 3. Apa yang dilakukan `install.sh` secara berurutan
 
 1. Validasi root & keberadaan `/dev/net/tun`.
 2. Deteksi OS (Ubuntu/Debian/RHEL/...) — distro asing diberi peringatan dan diminta konfirmasi, kecuali dipaksa.
 3. Deteksi interface jaringan utama & IP publik server.
-4. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
-5. Instal paket: `wireguard`, `wireguard-tools`, `iptables`, `qrencode`, `curl`, `iproute2`.
-6. Aktifkan IP forwarding IPv4 (+ IPv6 bila tersedia) beserta optimasi throughput (BBR, buffer TCP).
-7. Buka port UDP di UFW / firewalld.
-8. Generate server keypair WireGuard (`wg genkey | wg pubkey`).
-9. Tulis `/etc/wireguard/wg0.conf` (MTU 1420) lengkap dengan aturan NAT `PostUp`/`PostDown`.
-10. Simpan `/etc/wireguard/params` untuk dipakai skrip lain.
-11. Buat client pertama + file `.conf` + QR Code (PNG & tampil di terminal).
-12. Enable & start `wg-quick@wg0` via systemd.
-13. (Opsional) Setup OpenVPN / Shadowsocks bila diminta.
-14. Tampilkan ringkasan + QR code client pertama.
+4. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
+5. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
+6. Instal paket WireGuard + aktifkan IP forwarding & optimasi throughput (BBR, buffer TCP).
+7. Buka port UDP WireGuard di UFW / firewalld.
+8. Generate server keypair, tulis `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), simpan `params`.
+9. Buat client WireGuard pertama + `.conf` + QR Code, lalu enable & start `wg-quick@wg0`.
+10. **Pasang SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + WebSocket:80.
+11. **Pasang Xray-core** (default): 5 inbound VMess/VLESS/Trojan + XTLS-Vision + REALITY:443 + link koneksi & QR.
+12. (Opsional) OpenVPN / Shadowsocks bila diminta.
+13. Tampilkan ringkasan + perintah cepat.
 
 ### 4. Alternatif: pakai menu interaktif
 
@@ -134,60 +161,74 @@ Lihat semua opsi:
 sudo ./menu.sh
 ```
 
-Menu berisi: instal, tambah/hapus client, tampil QR, daftar client, cek status, instal OpenVPN/Shadowsocks, mulai ulang service, uninstall.
+Menu 0–15: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek status, instal SSH / OpenVPN / Xray / V2Ray / Shadowsocks, kelola akun SSH, kelola user Xray, mulai ulang service, uninstall.
 
 ---
 
-## 👤 Menambah Client / User Baru
+## 👤 WireGuard — Tambah / Hapus Client
 
 ```bash
-# Interaktif (ditanya nama client)
-sudo ./add-client.sh
-
-# Langsung dengan nama
-sudo ./add-client.sh hp-andi
-sudo ./add-client.sh laptop-kerja
+sudo ./add-client.sh                 # interaktif
+sudo ./add-client.sh hp-andi         # langsung
+sudo ./remove-client.sh hp-andi      # hapus (peer dihapus live + IP dipakai ulang)
+sudo ./list-clients.sh               # daftar + handshake terakhir + trafik up/down
+sudo ./show-qr.sh hp-andi            # tampilkan ulang QR + .conf
 ```
 
-Aturan nama client: huruf, angka, `-`, `_` saja, maksimal 32 karakter (contoh valid: `hp-andi`, `laptop_kerja`, `tablet01`).
+Aturan nama: huruf, angka, `-`, `_` saja, maksimal 32 karakter.
 
-Hasil setiap client:
-
-- `/etc/wireguard/clients/<nama>/<nama>.conf` — import ke aplikasi WireGuard (laptop/desktop).
-- QR Code tampil di terminal + tersimpan sebagai PNG — scan dari aplikasi WireGuard di HP.
-- IP dialokasikan otomatis dari subnet `10.66.66.0/24` (`10.66.66.2`, `.3`, dst.) + IPv6 `fd42:42:42::/64`.
-- Peer langsung dimuat ke interface `wg0` yang sedang berjalan tanpa memutus koneksi lama.
-
-### Cara pakai di perangkat client
-
-- **Android / iOS:** instal aplikasi *WireGuard* → tambah tunnel → *Scan from QR code* → arahkan ke QR di terminal, atau import file `.png`/`.conf`.
-- **Windows / macOS / Linux Desktop:** instal aplikasi *WireGuard* → *Import tunnel(s) from file* → pilih file `.conf` → *Activate*.
+- **Android / iOS:** aplikasi *WireGuard* → tambah tunnel → *Scan from QR code*.
+- **Windows / macOS / Linux Desktop:** aplikasi *WireGuard* → *Import tunnel(s) from file* → pilih `.conf` → *Activate*.
 
 ---
 
-## 🗑️ Menghapus Client / User
+## 🔑 SSH VPN — Kelola Akun
+
+Layanan default kedua setelah WireGuard. Port: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS **80**.
 
 ```bash
-# Interaktif (pilih dari daftar bernomor)
-sudo ./remove-client.sh
-
-# Langsung dengan nama
-sudo ./remove-client.sh hp-andi
+sudo ./add-ssh-user.sh                    # interaktif (password kosong = auto-generate)
+sudo ./add-ssh-user.sh andi               # password acak, berlaku 30 hari
+sudo ./add-ssh-user.sh andi 'R4h4s1a!' 90 # password sendiri, berlaku 90 hari
+sudo ./remove-ssh-user.sh andi            # hapus (sesi aktif ikut dimatikan)
 ```
 
-Skrip akan: menghapus peer dari interface `wg0` yang berjalan (via `wg set ... remove`), menghapus blok `[Peer]` dari `wg0.conf`, dan menghapus folder `/etc/wireguard/clients/<nama>/`. IP yang dibebaskan akan dipakai ulang oleh client baru berikutnya.
+Contoh koneksi dari laptop/HP:
+
+```bash
+ssh -p 22 andi@IP-SERVER
+```
+
+Untuk aplikasi tunneling (HTTP Custom, dsb.): gunakan host `IP-SERVER`, port WS `80` dengan payload WebSocket standar, atau port TLS `444` untuk SSH over TLS.
+
+---
+
+## ⚡ Xray / V2Ray — Kelola User (VMess / VLESS / Trojan + XTLS / REALITY)
+
+Satu user = 1 UUID yang langsung aktif di **semua 5 inbound**:
+
+| # | Protokol | Port | Cocok untuk |
+|---|---|---|---|
+| 1 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Utama** — paling efisien & anti-blokir, tanpa domain/TLS sendiri (SNI `www.microsoft.com`) |
+| 2 | VLESS + TCP + XTLS-Vision | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
+| 3 | VMess + WebSocket (`/vmess`) | 10001 | Kompatibilitas client lama |
+| 4 | VLESS + WebSocket (`/vless`) | 10002 | Balik CDN/reverse-proxy (Cloudflare dsb.) |
+| 5 | Trojan + WebSocket (`/trojan`) | 10003 | Samaran trafik HTTPS |
+
+```bash
+sudo ./add-xray-user.sh hp-andi       # buat user + cetak 5 link + QR REALITY
+sudo ./remove-xray-user.sh hp-andi    # hapus dari semua inbound
+```
+
+Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas: **VLESS REALITY > VLESS XTLS > VMess/VLESS/Trojan WS**. Salin link diawali `vless://...security=reality...` untuk hasil terbaik.
+
+Ganti engine default (`xray` → `v2ray`) saat instal: `sudo ./install.sh --with-v2ray --yes` atau `XRAY_ENGINE=v2ray sudo ./install.sh --yes`.
 
 ---
 
 ## 📋 Perintah Operasional Lainnya
 
 ```bash
-# Daftar client + status handshake terakhir + pemakaian download/upload
-sudo ./list-clients.sh
-
-# Tampilkan ulang QR code & isi .conf client tertentu
-sudo ./show-qr.sh hp-andi
-
 # Diagnostik server (service, forwarding, TUN, NAT, firewall)
 sudo ./status.sh
 
@@ -203,10 +244,10 @@ sudo ./uninstall.sh
 
 ## 🛡️ Detail Keamanan & Jaringan
 
-- **Kunci kriptografi:** setiap client punya keypair Curve25519 unik + Pre-Shared Key (PSK) untuk hardening terhadap serangan quantum.
-- **File sensitif** (`wg0.conf`, `params`, private key) diset permission `600`, direktori `700`.
-- **Server config** memakai `SaveConfig = false` agar edit manual via skrip tidak tertimpa.
-- **MTU 1420** di server & client (1500 − 80 byte overhead WireGuard) untuk mencegah fragmentasi.
+- **WireGuard:** keypair Curve25519 unik per client + PSK (quantum-resistance), file sensitif `600`/direktori `700`, `SaveConfig = false`, `MTU = 1420`, `PersistentKeepalive = 25`.
+- **SSH:** `PermitRootLogin no`, `MaxAuthTries 3`, `PasswordAuthentication yes` (untuk akun VPN), user `nologin` + tanggal kedaluwarsa, sesi user mati saat akun dihapus.
+- **Xray/REALITY:** kunci x25519 + shortId acak per server, `dest`/`SNI` domain besar TLSv1.3+H2, fingerprint `chrome`, flow `xtls-rprx-vision` (menghindari TLS-in-TLS).
+- **OpenVPN:** `data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305`, `auth SHA512`, `tls-version-min 1.3`, `tls-crypt`, Easy-RSA 3 PKI + CRL revocation.
 - **NAT/Masquerade** di-`PostUp` saat `wg0` naik:
   ```bash
   iptables -I FORWARD -i %i -j ACCEPT
@@ -214,9 +255,8 @@ sudo ./uninstall.sh
   iptables -t nat -I POSTROUTING -o <iface-utama> -j MASQUERADE
   ```
   (plus padanannya untuk `ip6tables`), dan dibersihkan otomatis di `PostDown`.
-- **UFW:** bila aktif, port dibuka + `DEFAULT_FORWARD_POLICY` diubah ke `ACCEPT` agar forwarding jalan.
-- **firewalld:** bila aktif, port dibuka + `masquerade` diaktifkan permanen.
-- **PersistentKeepalive = 25** di profil client agar koneksi stabil di belakang NAT.
+- **UFW:** bila aktif, semua port dibuka + `DEFAULT_FORWARD_POLICY` diubah ke `ACCEPT`.
+- **firewalld:** bila aktif, semua port dibuka + `masquerade` permanen.
 
 ---
 
@@ -229,7 +269,9 @@ sudo ./uninstall.sh
 | `wg-quick@wg0 gagal berjalan` | Lihat log: `journalctl -u wg-quick@wg0 -n 50 --no-pager`. Umumnya karena port bentrok — ganti port saat instalasi. |
 | Client connect tapi tidak bisa internet | Pastikan forwarding aktif (`cat /proc/sys/net/ipv4/ip_forward` harus `1`), cek NAT (`iptables -t nat -L -n`), dan pastikan firewall cloud provider membuka port UDP. |
 | `Port sudah dipakai` | Instalasi otomatis memberi peringatan — cek dengan `ss -lnup \| grep 51820`, pilih port lain via `./install.sh --port 51821`. |
-| QR tidak tampil di terminal | Terminal tidak dukung ANSI-UTF8 — gunakan file PNG di `/etc/wireguard/clients/<nama>/`. |
+| Service `xray` gagal start | Validasi config: `/usr/local/bin/xray run -test -config /etc/xray/config.json`; lihat log `journalctl -u xray -n 50 --no-pager` (umumnya port 443 bentrok dengan web server). |
+| REALITY tidak connect | Pastikan jam server akurat (NTP), SNI `serverNames` cocok dengan `serverName` client, dan `pbk`/`sid` disalin persis dari link server. |
+| QR tidak tampil di terminal | Terminal tidak dukung ANSI-UTF8 — gunakan file PNG di `/etc/wireguard/clients/<nama>/` atau salin link Xray manual. |
 | OS baru (mis. Ubuntu 26 / Debian 13) diperingatkan "belum teruji" | Lanjut dengan `y`, atau set `FORCE_OS=1`. Laporkan hasilnya via Issues agar daftar resmi diperbarui. |
 
 ---
@@ -239,7 +281,10 @@ sudo ./uninstall.sh
 - **Ganti port default:** edit `DEFAULT_PORT` di `install.sh`, atau instal dengan `--port <nomor>`.
 - **Ganti subnet VPN:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` di `install.sh` dan `base_v4`/`base_v6` di `lib/wireguard.sh` (pastikan konsisten di `wg_write_server_conf` dan `wg_get_next_ip`).
 - **Ganti DNS default:** edit `DEFAULT_DNS` di `install.sh`.
-- **Ganti versi Shadowsocks:** edit `SS_VERSION_DEFAULT` di `lib/shadowsocks.sh` (default: `v1.25.0`, cek rilis terbaru di [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
+- **Ganti versi Xray/V2Ray:** edit `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) di `lib/xray.sh` — cek rilis terbaru di [Xray-core releases](https://github.com/XTLS/Xray-core/releases) dan [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
+- **Ganti port inbound Xray:** edit `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY` di `lib/xray.sh` sebelum instalasi.
+- **Ganti SNI REALITY:** edit `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` di `lib/xray.sh` (syarat: domain asing, TLSv1.3 + H2, tidak redirect).
+- **Ganti versi Shadowsocks:** edit `SS_VERSION_DEFAULT` di `lib/shadowsocks.sh` (default: `v1.25.0`, cek [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
 - **Ganti cipher Shadowsocks:** edit `SS_METHOD_DEFAULT` di `lib/shadowsocks.sh` (default AEAD-2022 `2022-blake3-aes-256-gcm`; hemat CPU: `2022-blake3-aes-128-gcm`).
 - **Nonaktifkan IPv6 client:** hapus `, ::/0` dari `AllowedIPs` saat generate profil (atau edit manual file `.conf` client).
 

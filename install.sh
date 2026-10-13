@@ -23,6 +23,10 @@ source "$SCRIPT_DIR/lib/wireguard.sh"
 source "$SCRIPT_DIR/lib/openvpn.sh"
 # shellcheck source=lib/shadowsocks.sh
 source "$SCRIPT_DIR/lib/shadowsocks.sh"
+# shellcheck source=lib/ssh.sh
+source "$SCRIPT_DIR/lib/ssh.sh"
+# shellcheck source=lib/xray.sh
+source "$SCRIPT_DIR/lib/xray.sh"
 
 # Default Konfigurasi
 DEFAULT_PORT="51820"
@@ -53,6 +57,11 @@ CLI_DNS=""
 CLI_YES=0
 WITH_OPENVPN=0
 WITH_SHADOWSOCKS=0
+# SSH & Xray aktif default — bisa dimatikan eksplisit via --no-ssh / --no-xray
+WITH_SSH=1
+WITH_XRAY=1
+# Engine tunnel: "xray" (default, XTLS+REALITY) atau "v2ray"
+XRAY_ENGINE="${XRAY_ENGINE:-xray}"
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -66,9 +75,19 @@ parse_args() {
       -y|--yes)
         CLI_YES=1; AUTO_YES=1; shift ;;
       --with-openvpn)
-        WITH_OPENVPN=1; shift ;;
+        WITH_OPENVPN=1; WITH_SSH=0; shift ;;
+      --with-ssh)
+        WITH_SSH=1; WITH_OPENVPN=0; shift ;;
+      --no-ssh)
+        WITH_SSH=0; shift ;;
       --with-shadowsocks)
         WITH_SHADOWSOCKS=1; shift ;;
+      --with-xray)
+        WITH_XRAY=1; XRAY_ENGINE="xray"; shift ;;
+      --with-v2ray)
+        WITH_XRAY=1; XRAY_ENGINE="v2ray"; shift ;;
+      --no-xray)
+        WITH_XRAY=0; shift ;;
       -h|--help)
         echo "Penggunaan: sudo ./install.sh [opsi]"
         echo "Opsi:"
@@ -76,9 +95,19 @@ parse_args() {
         echo "  -c, --client <nama>        Nama client pertama (default: client1)"
         echo "  -d, --dns <ip1,ip2>        DNS Server (default: 1.1.1.1, 1.0.0.1)"
         echo "  -y, --yes                  Mode non-interaktif (gunakan nilai default)"
-        echo "      --with-openvpn         Sekaligus instal OpenVPN"
+        echo "      --with-ssh             Pasang SSH VPN (DEFAULT AKTIF)"
+        echo "      --with-openvpn         Pasang OpenVPN (pengganti SSH, saling eksklusif)"
+        echo "      --no-ssh               Jangan pasang SSH maupun OpenVPN"
+        echo "      --with-xray            Pasang Xray-core (DEFAULT AKTIF)"
+        echo "      --with-v2ray           Pasang v2ray-core (pengganti Xray)"
+        echo "      --no-xray              Jangan pasang Xray/V2Ray"
         echo "      --with-shadowsocks     Sekaligus instal Shadowsocks"
         echo "  -h, --help                 Tampilkan bantuan ini"
+        echo ""
+        echo "Contoh:"
+        echo "  sudo ./install.sh --yes                                   # default: WG + SSH + Xray"
+        echo "  sudo ./install.sh --with-openvpn --with-v2ray --yes       # WG + OpenVPN + V2Ray"
+        echo "  XRAY_ENGINE=v2ray sudo ./install.sh --yes                 # pilih engine via env"
         exit 0
         ;;
       *)
@@ -164,10 +193,35 @@ main() {
     FIRST_CLIENT="${input_client:-$DEFAULT_CLIENT}"
     validate_client_name "$FIRST_CLIENT"
 
-    # Opsi Protokol Tambahan
+    # Opsi Protokol Tambahan — SSH default YA, OpenVPN sebagai alternatif
     echo ""
-    read -rp "Ingin sekalian memasang OpenVPN? [y/N]: " ask_ovpn
-    [[ "$ask_ovpn" =~ ^[Yy]$ ]] && WITH_OPENVPN=1 || true
+    echo "Pilih layanan login tunnel:"
+    echo "  1) SSH VPN (Dropbear + Stunnel + WebSocket) — DEFAULT, ringan & universal"
+    echo "  2) OpenVPN (port 1194/UDP + profil .ovpn)"
+    echo "  3) Keduanya"
+    echo "  4) Tidak pasang keduanya"
+    read -rp "Pilih layanan login [1-4] (default 1): " login_choice
+    case "${login_choice:-1}" in
+      1) WITH_SSH=1; WITH_OPENVPN=0 ;;
+      2) WITH_SSH=0; WITH_OPENVPN=1 ;;
+      3) WITH_SSH=1; WITH_OPENVPN=1 ;;
+      4) WITH_SSH=0; WITH_OPENVPN=0 ;;
+      *) WITH_SSH=1; WITH_OPENVPN=0 ;;
+    esac
+
+    # Opsi Engine Tunnel — Xray default, V2Ray alternatif
+    echo ""
+    echo "Pilih engine tunnel (VMess/VLESS/Trojan + XTLS/REALITY):"
+    echo "  1) Xray-core v26.3.27 — DEFAULT, XTLS-Vision + REALITY tercepat"
+    echo "  2) v2ray-core v5.53.0 — alternatif stabil"
+    echo "  3) Tidak pasang keduanya"
+    read -rp "Pilih engine tunnel [1-3] (default 1): " engine_choice
+    case "${engine_choice:-1}" in
+      1) WITH_XRAY=1; XRAY_ENGINE="xray" ;;
+      2) WITH_XRAY=1; XRAY_ENGINE="v2ray" ;;
+      3) WITH_XRAY=0 ;;
+      *) WITH_XRAY=1; XRAY_ENGINE="xray" ;;
+    esac
 
     read -rp "Ingin sekalian memasang Shadowsocks? [y/N]: " ask_ss
     [[ "$ask_ss" =~ ^[Yy]$ ]] && WITH_SHADOWSOCKS=1 || true
@@ -213,12 +267,22 @@ main() {
   # 13. Aktifkan dan Jalankan Layanan WireGuard
   wg_enable_and_start
 
-  # 14. Pasang Protokol Opsional jika diminta
+  # 14. Pasang Protokol Tambahan sesuai pilihan (default: SSH + Xray)
+  if [[ "$WITH_SSH" -eq 1 ]]; then
+    log_step "Memasang SSH VPN Server (default)..."
+    ssh_setup_server "$SERVER_PUB_IP" 22 143 444 80
+  fi
+
   if [[ "$WITH_OPENVPN" -eq 1 ]]; then
     log_step "Memasang OpenVPN Server..."
     install_openvpn_packages
     ovpn_setup_server 1194 udp "$NET_IFACE" "$SERVER_PUB_IP"
     ovpn_create_client "${FIRST_CLIENT}-ovpn" || true
+  fi
+
+  if [[ "$WITH_XRAY" -eq 1 ]]; then
+    log_step "Memasang ${XRAY_ENGINE} Server (VMess/VLESS/Trojan + XTLS/REALITY)..."
+    xray_setup_server "$SERVER_PUB_IP"
   fi
 
   if [[ "$WITH_SHADOWSOCKS" -eq 1 ]]; then
@@ -249,6 +313,12 @@ main() {
   echo "  - Daftar client    : sudo ./list-clients.sh"
   echo "  - Cek status       : sudo ./status.sh"
   echo "  - Menu interaktif  : sudo ./menu.sh"
+  if [[ "$WITH_SSH" -eq 1 ]]; then
+    echo "  - Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>"
+  fi
+  if [[ "$WITH_XRAY" -eq 1 ]]; then
+    echo "  - User Xray/V2Ray  : sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>"
+  fi
   echo ""
 }
 

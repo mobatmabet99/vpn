@@ -74,11 +74,50 @@ if systemctl list-unit-files | grep -qE "openvpn-server@|openvpn@"; then
   fi
 fi
 
-if systemctl list-unit-files | grep -q "shadowsocks-rust"; then
+if systemctl list-unit-files 2>/dev/null | grep -q "shadowsocks-rust"; then
   echo "--------------------------------------------------------------------------------"
   echo -e "${_C_BOLD}LAYANAN SHADOWSOCKS:${_C_RESET}"
   if systemctl is-active --quiet shadowsocks-rust 2>/dev/null; then
     echo -e "Status Systemd        : ${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET}"
+  else
+    echo -e "Status Systemd        : ${_C_YELLOW}[INACTIVE]${_C_RESET}"
+  fi
+fi
+
+# 4b. Status Layanan SSH VPN (OpenSSH / Dropbear / Stunnel / WebSocket)
+if [[ -f /etc/ssh-vpn/params ]] || systemctl list-unit-files 2>/dev/null | grep -qE "^(ssh|sshd|dropbear|stunnel4|ssh-ws)\\.service"; then
+  echo "--------------------------------------------------------------------------------"
+  echo -e "${_C_BOLD}LAYANAN SSH VPN:${_C_RESET}"
+  for svc in ssh sshd dropbear stunnel4 ssh-ws; do
+    if systemctl list-unit-files 2>/dev/null | grep -q "^${svc}\\.service"; then
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        echo -e "  ${svc} : ${_C_GREEN}[ACTIVE]${_C_RESET}"
+      else
+        echo -e "  ${svc} : ${_C_YELLOW}[INACTIVE]${_C_RESET}"
+      fi
+    fi
+  done
+fi
+
+# 4c. Status Layanan Xray / V2Ray (VMess/VLESS/Trojan + XTLS/REALITY)
+if [[ -f /etc/xray/params ]] || systemctl list-unit-files 2>/dev/null | grep -q "^xray\\.service"; then
+  echo "--------------------------------------------------------------------------------"
+  echo -e "${_C_BOLD}LAYANAN XRAY/V2RAY:${_C_RESET}"
+  if systemctl is-active --quiet xray 2>/dev/null; then
+    echo -e "Status Systemd        : ${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET}"
+    if [[ -x /usr/local/bin/xray ]]; then
+      echo -e "Versi Binary          : $(/usr/local/bin/xray version 2>/dev/null | head -n1)"
+    fi
+    if [[ -f /etc/xray/params ]]; then
+      # shellcheck disable=SC1091
+      source /etc/xray/params
+      echo -e "Engine                : ${XRAY_ENGINE:-xray}"
+      echo -e "Port VMess WS         : ${XPORT_VMESS_WS:-10001}/tcp"
+      echo -e "Port VLESS WS         : ${XPORT_VLESS_WS:-10002}/tcp"
+      echo -e "Port Trojan WS        : ${XPORT_TROJAN_WS:-10003}/tcp"
+      echo -e "Port VLESS XTLS       : ${XPORT_VLESS_XTLS:-10004}/tcp"
+      echo -e "Port VLESS REALITY    : ${XPORT_VLESS_REALITY:-443}/tcp"
+    fi
   else
     echo -e "Status Systemd        : ${_C_YELLOW}[INACTIVE]${_C_RESET}"
   fi
