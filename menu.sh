@@ -74,9 +74,16 @@ EOF
   echo " [15] $(T "Uninstall / cleanly remove VPN from server" "Uninstall / Hapus Bersih VPN dari Server" "卸载 / 从服务器彻底删除 VPN")"
   echo " [16] $(T "Check IP & bandwidth limits (wrwb Store)" "Cek Limit IP & Bandwidth (wrwb Store)" "检查 IP 与带宽限制 (wrwb Store)")"
   echo " [17] $(T "Switch language (English/Indonesia/中文）" "Ganti bahasa (English/Indonesia/中文）" "切换语言 (英语/印尼语/中文）")"
+  echo "----------------------------------------------------------------"
+  echo " $(T "🆕 v3 Features:" "🆕 Fitur v3:" "🆕 v3 功能：")"
+  echo " [18] $(T "Setup Telegram Bot (remote management)" "Setup Bot Telegram (manajemen remote)" "配置 Telegram Bot（远程管理）")"
+  echo " [19] $(T "Setup Web Dashboard (browser control)" "Setup Web Dashboard (kontrol browser)" "配置 Web 控制面板（浏览器）")"
+  echo " [20] $(T "Setup Auto Backup (daily backups)" "Setup Auto Backup (backup harian)" "配置自动备份（每日备份）")"
+  echo " [21] $(T "Manual Backup Now" "Backup Manual Sekarang" "立即手动备份")"
+  echo " [22] $(T "Install ALL v3 Features" "Instal SEMUA Fitur v3" "安装所有 v3 功能")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store" "Dibuat oleh wrwb Store" "由 wrwb Store 打造")"
+  echo " $(T "by wrwb Store v3" "Dibuat oleh wrwb Store v3" "由 wrwb Store 打造 v3")"
 }
 
 pause() {
@@ -105,7 +112,7 @@ menu_switch_language() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "$(T "Choose menu [0-17]: " "Pilih menu [0-17]: " "选择菜单 [0-17]：")" choice
+    read -rp "$(T "Choose menu [0-22]: " "Pilih menu [0-22]: " "选择菜单 [0-22]：")" choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -229,6 +236,26 @@ main_loop() {
         ;;
       17)
         menu_switch_language
+        pause
+        ;;
+      18)
+        "$SCRIPT_DIR/setup-telegram-bot.sh"
+        pause
+        ;;
+      19)
+        "$SCRIPT_DIR/setup-web-dashboard.sh"
+        pause
+        ;;
+      20)
+        "$SCRIPT_DIR/setup-auto-backup.sh"
+        pause
+        ;;
+      21)
+        "$SCRIPT_DIR/backup.sh" manual
+        pause
+        ;;
+      22)
+        "$SCRIPT_DIR/setup-all-v3.sh"
         pause
         ;;
       0)
