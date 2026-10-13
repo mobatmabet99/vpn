@@ -4,21 +4,26 @@
 
 > 📖 English version (default): [README.en.md](README.en.md)
 > 📖 中文版: [README.zh.md](README.zh.md) (简体中文)
->
-> **Baru di v1.4:** installer trilingual **English (default) / Indonesia / 中文**.
-> Saat instalasi Anda ditanya bahasa — tekan Enter saja = otomatis **English**.
-> Detail: [CHANGELOG-v1.4.md](CHANGELOG-v1.4.md).
->
-> **Baru di v1.3:** installer bilingual **English (default) / Indonesia**.
-> Detail: [CHANGELOG-v1.3.md](CHANGELOG-v1.3.md).
 
 Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai mesin utama, dengan **SSH VPN** dan **Xray-core** terpasang **secara default**, plus opsi **OpenVPN**, **v2ray-core**, dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
 
 > Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — clone repo ini ke server Linux Anda.
->
-> **Baru di v1.2:** setiap akun baru menanyakan **Limit IP** dan **Limit Bandwidth**
-> (default **2 IP** & **100 GB/bulan** bila di-skip). Multi-login melebihi limit =
-> **auto-suspend 5 menit + auto-clear sesi**. Detail: [CHANGELOG-v1.2.md](CHANGELOG-v1.2.md).
+
+---
+
+## 🖥️ Dukungan OS & Spesifikasi Minimum
+
+**OS yang didukung:**
+- Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS
+- Debian 10 / 11 / 12 / 13
+- CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora
+
+**Spesifikasi minimum VPS:**
+- CPU: 1 vCPU
+- RAM: 512 MB (1 GB+ direkomendasikan, terutama untuk fitur v3: Web Dashboard + Telegram Bot)
+- Disk: 5 GB ruang kosong (10 GB+ direkomendasikan bila memakai backup otomatis)
+- Jaringan: IP publik, koneksi internet, dan perangkat TUN (`/dev/net/tun`)
+- Akses: root / `sudo`
 
 ---
 
@@ -48,7 +53,6 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | ⚡ **Xray-core (default ON)** | v26.3.27 stabil — 5 inbound sekaligus: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis |
 | 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
-| 🖥️ **Dukungan OS** | Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS, Debian 10 / 11 / 12 / 13, CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora |
 | 🛡️ **Firewall otomatis** | Membuka semua port VPN (UDP + TCP) di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |

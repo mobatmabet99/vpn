@@ -8,14 +8,22 @@
 >
 > 📖 English version (default): [README.en.md](README.en.md)
 > 📖 Versi Indonesia: [README.md](README.md)
->
-> **v1.4 新特性：** 三语安装程序 **English (默认) / Indonesia / 中文**。安装时会询问语言 — 直接按回车即为英文。详情：[CHANGELOG-v1.4.md](CHANGELOG-v1.4.md)。
->
-> **v1.3 特性：** 双语安装程序 **English (默认) / Indonesia**。详情：[CHANGELOG-v1.3.md](CHANGELOG-v1.3.md)。
->
-> **v1.2 特性：** 每个新账号都会询问 **IP 限制** 与 **带宽限制**
-> （跳过即默认 **2 IP** & **100 GB/月**）。多登录超限 =
-> **自动暂停 5 分钟 + 自动清理会话**。详情：[CHANGELOG-v1.2.md](CHANGELOG-v1.2.md)。
+
+---
+
+## 🖥️ 系统支持与最低配置
+
+**支持的系统：**
+- Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS
+- Debian 10 / 11 / 12 / 13
+- CentOS / Rocky / AlmaLinux 8 / 9，RHEL 8/9，Fedora
+
+**VPS 最低配置：**
+- CPU：1 vCPU
+- 内存：512 MB（推荐 1 GB+，使用 v3 功能 Web 控制面板 + Telegram Bot 时尤其需要）
+- 磁盘：5 GB 可用空间（使用自动备份时推荐 10 GB+）
+- 网络：公网 IP、互联网连接、TUN 设备（`/dev/net/tun`）
+- 权限：root / `sudo`
 
 ---
 
@@ -45,7 +53,6 @@
 | ⚡ **Xray-core (默认开启)** | v26.3.27 稳定版 — 5 个入站同时运行：VMess WS (10001)、VLESS WS (10002)、Trojan WS (10003)、VLESS TCP XTLS-Vision (10004)、**VLESS TCP XTLS-Vision + REALITY (443)**。1 个 UUID 通用于所有协议 + 自动生成链接与二维码 |
 | 🔄 **备用引擎** | v2ray-core v5.53.0 (通过 `--with-v2ray` 或 `XRAY_ENGINE=v2ray` 切换)；OpenVPN 2.7/2.6 (加密 `AES-256-GCM` + `CHACHA20-POLY1305`，认证 `SHA512`，TLS 最低 1.3，`.ovpn` 配置) 可替代 SSH |
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
-| 🖥️ **系统支持** | Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS，Debian 10 / 11 / 12 / 13，CentOS / Rocky / AlmaLinux 8 / 9，RHEL 8/9，Fedora |
 | 🛡️ **自动防火墙** | 在 **UFW** (Debian/Ubuntu) 或 **firewalld** (RHEL/Rocky) 中开放所有 VPN 端口 (UDP + TCP) |
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |

@@ -8,14 +8,22 @@
 >
 > 📖 Versi Indonesia: [README.md](README.md) (Bahasa Indonesia)
 > 📖 中文版: [README.zh.md](README.zh.md) (简体中文)
->
-> **New in v1.4:** trilingual installer **English (default) / Indonesia / 中文**. You are asked for language at install time — just press Enter for English. Details: [CHANGELOG-v1.4.md](CHANGELOG-v1.4.md).
->
-> **New in v1.3:** bilingual installer **English (default) / Indonesia**. Details: [CHANGELOG-v1.3.md](CHANGELOG-v1.3.md).
->
-> **New in v1.2:** every new account asks for **IP Limit** and **Bandwidth Limit**
-> (default **2 IPs** & **100 GB/month** when skipped). Multi-login over limit =
-> **auto-suspend 5 minutes + auto-clear sessions**. Details: [CHANGELOG-v1.2.md](CHANGELOG-v1.2.md).
+
+---
+
+## 🖥️ OS Support & Minimum Requirements
+
+**Supported OS:**
+- Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS
+- Debian 10 / 11 / 12 / 13
+- CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora
+
+**Minimum VPS specs:**
+- CPU: 1 vCPU
+- RAM: 512 MB (1 GB+ recommended, especially for v3 features: Web Dashboard + Telegram Bot)
+- Disk: 5 GB free space (10 GB+ recommended when using automatic backups)
+- Network: public IP, internet access, and TUN device (`/dev/net/tun`)
+- Access: root / `sudo`
 
 ---
 
@@ -45,7 +53,6 @@
 | ⚡ **Xray-core (default ON)** | v26.3.27 stable — 5 inbounds at once: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID works for all protocols + auto links & QR |
 | 🔄 **Alternative engine** | v2ray-core v5.53.0 (switch via `--with-v2ray` or `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, `.ovpn` profile) as SSH replacement |
 | 👻 **Shadowsocks (optional)** | shadowsocks-rust v1.25.0, AEAD-2022 cipher `2022-blake3-aes-256-gcm` + `ss://` URI + QR |
-| 🖥️ **OS Support** | Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS, Debian 10 / 11 / 12 / 13, CentOS / Rocky / AlmaLinux 8 / 9, RHEL 8/9, Fedora |
 | 🛡️ **Auto firewall** | Opens all VPN ports (UDP + TCP) in **UFW** (Debian/Ubuntu) or **firewalld** (RHEL/Rocky) |
 | 🌐 **IP Forwarding** | Enables `net.ipv4.ip_forward=1` + IPv6 forwarding persistently (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
