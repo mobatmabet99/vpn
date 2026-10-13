@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 #  check-limits.sh — View IP limits, bandwidth usage & suspend status
-#  Bilingual EN/ID (default: English). By wrwb Store
+#  Trilingual EN/ID/ZH (default: English). By wrwb Store
 #  Usage:
 #    sudo ./check-limits.sh [username]   # empty = all users
 # ==============================================================================
@@ -21,13 +21,13 @@ limits_init
 FILTER="${1:-}"
 
 echo "======================================================================"
-echo -e "${_C_BOLD}$(T "IP & BANDWIDTH LIMITS — wrwb Store" "LIMIT IP & BANDWIDTH — wrwb Store")${_C_RESET}"
+echo -e "${_C_BOLD}$(T "IP & BANDWIDTH LIMITS — wrwb Store" "LIMIT IP & BANDWIDTH — wrwb Store" "IP 与带宽限制 — wrwb Store")${_C_RESET}"
 echo "======================================================================"
-printf "%-18s %-8s %-8s %-20s %-14s\n" "USER" "MAX-IP" "$(T "ACTIVE" "AKTIF")" "$(T "QUOTA (USED/MAX)" "KUOTA (PAKAI/MAX)")" "STATUS"
+printf "%-18s %-8s %-8s %-20s %-14s\n" "USER" "MAX-IP" "$(T "ACTIVE" "AKTIF" "运行中")" "$(T "QUOTA (USED/MAX)" "KUOTA (PAKAI/MAX)" "配额 (已用/上限)")" "STATUS"
 echo "----------------------------------------------------------------------"
 
 if [[ ! -s "$LIMITS_DB" ]]; then
-  echo " $(T "(No users registered in the limit database yet)" "(Belum ada user yang terdaftar di database limit)")"
+  echo " $(T "(No users registered in the limit database yet)" "(Belum ada user yang terdaftar di database limit)" "(限制数据库中尚未注册任何用户)")"
 else
   while IFS=: read -r user max_ip max_gb _rest; do
     [[ -z "$user" ]] && continue
@@ -40,7 +40,7 @@ else
     active_ips="$(session_count_ips "$user")"
     bytes_used="$(usage_get_bytes "$user")"
     gb_used="$(awk -v b="$bytes_used" 'BEGIN { printf "%.2f", b/1073741824 }')"
-    status="$(T "ACTIVE" "AKTIF")"
+    status="$(T "ACTIVE" "AKTIF" "运行中")"
     if suspend_is_active "$user"; then
       remain="$(suspend_remaining "$user")"
       status="SUSPEND ${remain}s"
@@ -52,7 +52,7 @@ else
 fi
 
 echo "----------------------------------------------------------------------"
-echo "$(T "Default for new accounts: 2 concurrent IPs, 100 GB/month." "Default akun baru: 2 IP concurrent, 100 GB/bulan.")"
-echo "$(T "Multi-login over the limit = auto-suspend 5 minutes + auto-clear sessions." "Multi-login > limit = auto-suspend 5 menit + auto-clear sesi.")"
-echo "$(T "By wrwb Store" "Dibuat oleh wrwb Store")"
+echo "$(T "Default for new accounts: 2 concurrent IPs, 100 GB/month." "Default akun baru: 2 IP concurrent, 100 GB/bulan." "新账号默认：2 个并发 IP，100 GB/月。")"
+echo "$(T "Multi-login over the limit = auto-suspend 5 minutes + auto-clear sessions." "Multi-login > limit = auto-suspend 5 menit + auto-clear sesi." "多登录超限 = 自动暂停 5 分钟 + 自动清理会话。")"
+echo "$(T "By wrwb Store" "Dibuat oleh wrwb Store" "由 wrwb Store 打造")"
 echo "======================================================================"

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# lib/limits.sh — IP & bandwidth limit enforcement (wrwb Store, bilingual EN/ID)
+# lib/limits.sh — IP & bandwidth limit enforcement (wrwb Store, trilingual EN/ID/ZH)
 #
 # v1.2 features:
 #   - Concurrent IP limit per user/client (default: 2 IPs)
@@ -92,9 +92,9 @@ limits_show_user() {
   bytes_used="$(usage_get_bytes "$user")"
   gb_used="$(awk -v b="$bytes_used" 'BEGIN { printf "%.2f", b/1073741824 }')"
   ips="$(session_count_ips "$user")"
-  echo "User: $user | $(T "IP limit: $max_ip (active: $ips)" "Limit IP: $max_ip (aktif: $ips)") | $(T "Quota: ${gb_used}/${max_gb} GB" "Kuota: ${gb_used}/${max_gb} GB")"
+  echo "User: $user | $(T "IP limit: $max_ip (active: $ips)" "Limit IP: $max_ip (aktif: $ips)" "IP 限制：$max_ip（活跃：$ips）") | $(T "Quota: ${gb_used}/${max_gb} GB" "Kuota: ${gb_used}/${max_gb} GB" "配额：${gb_used}/${max_gb} GB")"
   if suspend_is_active "$user"; then
-    echo "Status: SUSPENDED ($(T "multi-login, wait 5 minutes" "multi-login, tunggu 5 menit"))"
+    echo "Status: SUSPENDED ($(T "multi-login, wait 5 minutes" "multi-login, tunggu 5 menit" "多登录，请等待 5 分钟"))"
   fi
 }
 
@@ -351,9 +351,9 @@ suspend_add() {
   rm -f "$tmp"
   echo "${user}:${until_epoch}" >> "$SUSPEND_DB"
   if declare -f log_warn &>/dev/null; then
-    log_warn "$(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login.")"
+    log_warn "$(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login." "用户 '$user' 因多登录被暂停 $((duration / 60)) 分钟。")"
   else
-    echo "[WARN] $(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login.")" >&2
+    echo "[WARN] $(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login." "用户 '$user' 因多登录被暂停 $((duration / 60)) 分钟。")" >&2
   fi
 }
 
@@ -410,7 +410,7 @@ suspend_clear_sessions() {
   fi
   if [[ "$mode" != "silent" ]]; then
     if declare -f log_info &>/dev/null; then
-      log_info "$(T "All sessions of user '$user' were cleared." "Semua sesi user '$user' dibersihkan.")"
+      log_info "$(T "All sessions of user '$user' were cleared." "Semua sesi user '$user' dibersihkan." "用户 '$user' 的所有会话已清除。")"
     fi
   fi
 }
@@ -437,7 +437,7 @@ limits_enforce_all() {
     # 2. Check the bandwidth limit
     if ! usage_check_limit "$user"; then
       if declare -f log_warn &>/dev/null; then
-        log_warn "$(T "User '$user' exceeded the ${max_gb} GB/month bandwidth limit. Disable manually when needed." "User '$user' melebihi bandwidth limit ${max_gb} GB/bulan. Nonaktifkan manual bila perlu.")"
+        log_warn "$(T "User '$user' exceeded the ${max_gb} GB/month bandwidth limit. Disable manually when needed." "User '$user' melebihi bandwidth limit ${max_gb} GB/bulan. Nonaktifkan manual bila perlu." "用户 '$user' 已超出 ${max_gb} GB/月的带宽限制。如有需要请手动停用。")"
       fi
       continue
     fi
@@ -450,7 +450,7 @@ limits_enforce_all() {
       local ip_list
       ip_list="$(session_list_ips "$user" | tr '\n' ' ')"
       if declare -f log_warn &>/dev/null; then
-        log_warn "$(T "User '$user' multi-login: $current_ips IPs (limit: $max_ip) [$ip_list]. Auto-suspend 5 min + clear sessions." "User '$user' multi-login: $current_ips IP (limit: $max_ip) [$ip_list]. Auto-suspend 5 menit + clear sesi.")"
+        log_warn "$(T "User '$user' multi-login: $current_ips IPs (limit: $max_ip) [$ip_list]. Auto-suspend 5 min + clear sessions." "User '$user' multi-login: $current_ips IP (limit: $max_ip) [$ip_list]. Auto-suspend 5 menit + clear sesi." "用户 '$user' 多登录：$current_ips 个 IP（限制：$max_ip）[$ip_list]。自动暂停 5 分钟并清除会话。")"
       fi
       suspend_add "$user" "$SUSPEND_SECONDS_DEFAULT"
       suspend_clear_sessions "$user"
@@ -461,7 +461,7 @@ limits_enforce_all() {
 # ------------------------------------------------------- Systemd monitor service
 limits_install_monitor_service() {
   if declare -f log_step &>/dev/null; then
-    log_step "$(T "Installing the wrwb Store limit monitor service (checks every 60 seconds)..." "Memasang layanan monitor limit wrwb Store (cek setiap 60 detik)...")"
+    log_step "$(T "Installing the wrwb Store limit monitor service (checks every 60 seconds)..." "Memasang layanan monitor limit wrwb Store (cek setiap 60 detik)..." "正在安装由 wrwb Store 打造的限制监控服务（每 60 秒检查一次）...")"
   fi
 
   local repo_lib_dir="$SCRIPT_DIR/lib"
@@ -522,7 +522,7 @@ SERVICE_EOF
   systemctl restart vpn-limits.service 2>/dev/null || true
 
   if declare -f log_success &>/dev/null; then
-    log_success "$(T "Limit monitor service is active (checks every 60 seconds) — wrwb Store." "Layanan monitor limit aktif (cek setiap 60 detik) — wrwb Store.")"
+    log_success "$(T "Limit monitor service is active (checks every 60 seconds) — wrwb Store." "Layanan monitor limit aktif (cek setiap 60 detik) — wrwb Store." "限制监控服务运行中（每 60 秒检查一次）——由 wrwb Store 打造。")"
   fi
 }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# lib/openvpn.sh — Optional OpenVPN module (bilingual EN/ID)
+# lib/openvpn.sh — Optional OpenVPN module (trilingual EN/ID/ZH)
 # Provides OpenVPN server setup and client profile (.ovpn) export
 # Branding: wrwb Store
 #
@@ -16,7 +16,7 @@ OVPN_CLIENTS_DIR="$OVPN_DIR/clients"
 OVPN_PARAMS="/etc/openvpn/params"
 
 install_openvpn_packages() {
-  log_step "$(T "Installing OpenVPN & Easy-RSA dependencies..." "Menginstal dependensi OpenVPN & Easy-RSA...")"
+  log_step "$(T "Installing OpenVPN & Easy-RSA dependencies..." "Menginstal dependensi OpenVPN & Easy-RSA..." "正在安装 OpenVPN 和 Easy-RSA 依赖...")"
   detect_os
 
   case "$PKG_MGR" in
@@ -32,11 +32,11 @@ install_openvpn_packages() {
       pacman -Sy --noconfirm openvpn easy-rsa openssl iptables curl qrencode
       ;;
     *)
-      die "$(T "Package manager $PKG_MGR is not supported for automatic OpenVPN install." "Package manager $PKG_MGR belum didukung untuk instalasi OpenVPN otomatis.")"
+      die "$(T "Package manager $PKG_MGR is not supported for automatic OpenVPN install." "Package manager $PKG_MGR belum didukung untuk instalasi OpenVPN otomatis." "软件包管理器 $PKG_MGR 不支持自动安装 OpenVPN。")"
       ;;
   esac
 
-  log_success "$(T "OpenVPN packages installed." "Paket OpenVPN terinstal.")"
+  log_success "$(T "OpenVPN packages installed." "Paket OpenVPN terinstal." "OpenVPN 软件包已安装。")"
 }
 
 ovpn_setup_server() {
@@ -48,7 +48,7 @@ ovpn_setup_server() {
   mkdir -p "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
   chmod 700 "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
 
-  log_step "$(T "Setting up the OpenVPN Public Key Infrastructure (PKI)..." "Menyiapkan Public Key Infrastructure (PKI) OpenVPN...")"
+  log_step "$(T "Setting up the OpenVPN Public Key Infrastructure (PKI)..." "Menyiapkan Public Key Infrastructure (PKI) OpenVPN..." "正在搭建 OpenVPN 公钥基础设施（PKI）...")"
   local easyrsa_dir="/etc/openvpn/easy-rsa"
   rm -rf "$easyrsa_dir"
   mkdir -p "$easyrsa_dir"
@@ -68,11 +68,11 @@ ovpn_setup_server() {
   fi
 
   if [[ -z "$src_easyrsa" || ! -f "$src_easyrsa/easyrsa" ]]; then
-    die "$(T "The easy-rsa binary was not found. Make sure the easy-rsa package is installed." "Biner easy-rsa tidak ditemukan. Pastikan paket easy-rsa sudah terpasang.")"
+    die "$(T "The easy-rsa binary was not found. Make sure the easy-rsa package is installed." "Biner easy-rsa tidak ditemukan. Pastikan paket easy-rsa sudah terpasang." "未找到 easy-rsa 可执行文件。请确保已安装 easy-rsa 软件包。")"
   fi
 
   cp -r "$src_easyrsa"/* "$easyrsa_dir/"
-  cd "$easyrsa_dir" || die "$(T "Cannot enter $easyrsa_dir" "Gagal masuk $easyrsa_dir")"
+  cd "$easyrsa_dir" || die "$(T "Cannot enter $easyrsa_dir" "Gagal masuk $easyrsa_dir" "无法进入 $easyrsa_dir")"
 
   # Non-interactive PKI init
   export EASYRSA_BATCH=1
@@ -143,7 +143,7 @@ EOF
   chmod 600 "$OVPN_PARAMS"
 
   # Enable the service
-  log_step "$(T "Enabling the OpenVPN service..." "Mengaktifkan service OpenVPN...")"
+  log_step "$(T "Enabling the OpenVPN service..." "Mengaktifkan service OpenVPN..." "正在启用 OpenVPN 服务...")"
   if systemctl list-unit-files | grep -q "openvpn-server@"; then
     systemctl daemon-reload
     systemctl enable openvpn-server@server.service
@@ -162,18 +162,18 @@ EOF
   iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT 2>/dev/null || true
   iptables -I FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 
-  log_success "$(T "OpenVPN server is ready on port $port/$proto." "OpenVPN server berhasil disiapkan pada port $port/$proto.")"
+  log_success "$(T "OpenVPN server is ready on port $port/$proto." "OpenVPN server berhasil disiapkan pada port $port/$proto." "OpenVPN 服务器已在端口 $port/$proto 就绪。")"
 }
 
 ovpn_create_client() {
   local name="$1"
   validate_client_name "$name"
-  [[ -f "$OVPN_PARAMS" ]] || die "$(T "OpenVPN is not installed yet. Run the server setup first." "OpenVPN belum terpasang. Jalankan setup server dulu.")"
+  [[ -f "$OVPN_PARAMS" ]] || die "$(T "OpenVPN is not installed yet. Run the server setup first." "OpenVPN belum terpasang. Jalankan setup server dulu." "OpenVPN 尚未安装。请先运行服务器设置。")"
   # shellcheck disable=SC1090
   source "$OVPN_PARAMS"
 
   local easyrsa_dir="/etc/openvpn/easy-rsa"
-  cd "$easyrsa_dir" || die "$(T "Directory $easyrsa_dir was not found." "Direktori $easyrsa_dir tidak ditemukan.")"
+  cd "$easyrsa_dir" || die "$(T "Directory $easyrsa_dir was not found." "Direktori $easyrsa_dir tidak ditemukan." "未找到目录 $easyrsa_dir。")"
 
   export EASYRSA_BATCH=1
   export EASYRSA_CERT_EXPIRE=3650
@@ -213,7 +213,7 @@ $(cat "$OVPN_SERVER_DIR/tc.key")
 EOF
   chmod 600 "$client_conf"
 
-  log_success "$(T "OpenVPN client '$name' created at: $client_conf" "Client OpenVPN '$name' berhasil dibuat di: $client_conf")"
+  log_success "$(T "OpenVPN client '$name' created at: $client_conf" "Client OpenVPN '$name' berhasil dibuat di: $client_conf" "OpenVPN 客户端 '$name' 已创建于：$client_conf")"
   LAST_OVPN_CONF="$client_conf"
 }
 
@@ -232,5 +232,5 @@ ovpn_remove_client() {
   fi
 
   rm -f "$OVPN_CLIENTS_DIR/${name}.ovpn"
-  log_success "$(T "OpenVPN client '$name' revoked and its file removed." "Client OpenVPN '$name' dicabut dan filenya dihapus.")"
+  log_success "$(T "OpenVPN client '$name' revoked and its file removed." "Client OpenVPN '$name' dicabut dan filenya dihapus." "OpenVPN 客户端 '$name' 已吊销，文件已删除。")"
 }

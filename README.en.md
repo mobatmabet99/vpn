@@ -6,9 +6,12 @@
 
 > Made for Linux Servers (VPS / Bare Metal). Not for running on Windows — clone this repo to your Linux server.
 >
-> 📖 Indonesian version: [README.md](README.md) (Bahasa Indonesia)
+> 📖 Versi Indonesia: [README.md](README.md) (Bahasa Indonesia)
+> 📖 中文版: [README.zh.md](README.zh.md) (简体中文)
 >
-> **New in v1.3:** bilingual installer **English (default) / Indonesia**. You are asked for language at install time — just press Enter for English. Details: [CHANGELOG-v1.3.md](CHANGELOG-v1.3.md).
+> **New in v1.4:** trilingual installer **English (default) / Indonesia / 中文**. You are asked for language at install time — just press Enter for English. Details: [CHANGELOG-v1.4.md](CHANGELOG-v1.4.md).
+>
+> **New in v1.3:** bilingual installer **English (default) / Indonesia**. Details: [CHANGELOG-v1.3.md](CHANGELOG-v1.3.md).
 >
 > **New in v1.2:** every new account asks for **IP Limit** and **Bandwidth Limit**
 > (default **2 IPs** & **100 GB/month** when skipped). Multi-login over limit =
@@ -16,18 +19,20 @@
 
 ---
 
-## 🌐 Language / Bahasa
+## 🌐 Language / Bahasa / 语言
 
 - Default language: **English**. Just press **Enter** at the language prompt.
 - Select **2) Indonesia** for the Indonesian installer.
+- 选择 **3) 中文** 为简体中文安装程序。
 - Non-interactive / automation:
   ```bash
   sudo ./install.sh --yes                 # English (default)
   sudo ./install.sh --lang id --yes       # Indonesian
-  VPN_LANG=id sudo ./install.sh --yes     # via env var
+  sudo ./install.sh --lang zh --yes       # 中文
+  VPN_LANG=zh sudo ./install.sh --yes     # via env var
   ```
-- Choice is saved in `/etc/vpn/lang` and used by all scripts (`add-client.sh`, `menu.sh`, `status.sh`, ...).
-- Switch anytime: `sudo ./menu.sh` → menu **17) Switch language**, or `sudo ./menu.sh --lang en|id`.
+- Choice is saved in `/etc/vpn/lang` (`en` / `id` / `zh`) and used by all scripts (`add-client.sh`, `menu.sh`, `status.sh`, ...).
+- Switch anytime: `sudo ./menu.sh` → menu **17) Switch language**, or `sudo ./menu.sh --lang en|id|zh`.
 
 ---
 
@@ -46,7 +51,7 @@
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
 | 🔀 **NAT / Masquerade** | Automatic `iptables ... -j MASQUERADE` via WireGuard `PostUp`/`PostDown` so client internet works |
 | 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-17), `uninstall.sh`, plus libraries in `lib/` (including `lib/lang.sh`, `lib/limits.sh`) |
-| 🌐 **Bilingual (v1.3)** | English default, Indonesian optional. Single codebase via `T "English" "Indonesia"` in `lib/lang.sh`, saved in `/etc/vpn/lang` |
+| 🌐 **Trilingual (v1.4)** | English default, Indonesian + Chinese optional. Single codebase via `T "English" "Indonesia" "中文"` in `lib/lang.sh`, saved in `/etc/vpn/lang` |
 | ⚠️ **Error handling** | Requires root/sudo, checks `/dev/net/tun`, OS detection + untested-distro warning, port & dependency checks, client/user name validation, old-config backup |
 | ⏱️ **Limits & suspend (v1.2)** | Concurrent IP + monthly bandwidth GB limit per account (default 2 IPs & 100 GB). Multi-login over limit = 5-minute auto-suspend + auto-clear sessions. `vpn-limits` systemd monitor every 60 seconds |
 
@@ -70,11 +75,13 @@ vpn/
 ├── menu.sh                 # Interactive menu 0-17 (wrwb Store control panel)
 ├── uninstall.sh            # Fully remove VPN install (+ limit monitor, + /etc/vpn/lang)
 ├── README.md               # Indonesian docs
-├── README.en.md            # English docs (this file)
+├── README.en.md            # English docs (default, this file)
+├── README.zh.md            # Chinese docs (简体中文)
 ├── CHANGELOG-v1.2.md       # v1.2 release notes (IP & bandwidth limits)
 ├── CHANGELOG-v1.3.md       # v1.3 release notes (bilingual EN/ID)
+├── CHANGELOG-v1.4.md       # v1.4 release notes (trilingual EN/ID/ZH)
 ├── lib/
-│   ├── lang.sh             # v1.3 bilingual core: T "EN" "ID", /etc/vpn/lang
+│   ├── lang.sh             # v1.4 trilingual core: T "EN" "ID" "ZH", /etc/vpn/lang
 │   ├── common.sh           # Logging, OS detect, validation, network helpers, params
 │   ├── system.sh           # Package install, IP forwarding, firewall (UFW/firewalld)
 │   ├── wireguard.sh        # WireGuard core: server conf, IP alloc, client CRUD
@@ -95,7 +102,7 @@ Generated config files on the server:
     ├── <name>.conf                # Client profile (import into WireGuard app)
     ├── <name>.png                 # QR code (for phones/tablets)
     └── private.key / public.key / preshared.key
-/etc/vpn/lang                      # v1.3 language choice ("en" or "id")
+/etc/vpn/lang                      # v1.4 language choice ("en" / "id" / "zh")
 /etc/ssh-vpn/params                # SSH/Dropbear/TLS/WS ports + public IP
 /etc/ssh-vpn/accounts.db           # SSH account DB (user:created:expiry)
 /etc/xray/config.json              # Xray/V2Ray config (5 inbounds)
@@ -138,10 +145,11 @@ sudo ./install.sh
 ```
 
 ```
-Choose installation language / Pilih bahasa instalasi:
+Choose installation language / Pilih bahasa instalasi / 选择安装语言：
   1) English (default)
   2) Indonesia
-Select [1-2] / Pilih [1-2] (default 1 - English):
+  3) 中文 (简体)
+Select [1-3] / Pilih [1-3] / 选择 [1-3] (default 1 - English):
 ```
 
 Non-interactive — full defaults (**WireGuard + SSH + Xray**, good for automation, English):
@@ -165,6 +173,9 @@ sudo ./install.sh --no-ssh --no-xray --yes
 # Indonesian installer, non-interactive
 sudo ./install.sh --lang id --yes
 
+# Chinese installer, non-interactive
+sudo ./install.sh --lang zh --yes
+
 # Pick engine via env var
 XRAY_ENGINE=v2ray sudo ./install.sh --yes
 ```
@@ -181,7 +192,7 @@ See all options:
 | `--with-openvpn` | Install OpenVPN **instead of** SSH (mutually exclusive, can combine manually) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pick tunnel engine (default: Xray). `--with-v2ray` = v2ray-core engine |
 | `--with-shadowsocks` | Also add Shadowsocks (default: no) |
-| `--lang en\|id` | Installer language (default: en). Also `VPN_LANG=en\|id` env |
+| `--lang en\|id\|zh` | Installer language (default: en). Also `VPN_LANG=en\|id\|zh` env |
 | `-p/-c/-d/-y` | WG port, first client name, DNS, non-interactive mode |
 
 ### 3. What `install.sh` does in order
@@ -205,7 +216,7 @@ See all options:
 
 ```bash
 sudo ./menu.sh
-sudo ./menu.sh --lang id   # force Indonesian for this run
+sudo ./menu.sh --lang zh   # force Chinese for this run
 ```
 
 Menu 0–17: install WG, add/remove WG client, show QR, list clients, check status, install SSH / OpenVPN / Xray / V2Ray / Shadowsocks, manage SSH accounts, manage Xray users, restart services, check limits, switch language (17), uninstall.
@@ -351,7 +362,7 @@ sudo ./uninstall.sh
 | REALITY won't connect | Ensure server clock is accurate (NTP), `serverNames` SNI matches client `serverName`, and `pbk`/`sid` copied exactly from server link. |
 | QR missing in terminal | Terminal lacks ANSI-UTF8 — use PNG file in `/etc/wireguard/clients/<name>/` or copy Xray link manually. |
 | New OS (e.g. Ubuntu 26 / Debian 13) warns "untested" | Continue with `y`, or set `FORCE_OS=1`. Report results via Issues so the official list can be updated. |
-| Wrong language | Re-run `sudo ./menu.sh` → 17, or `VPN_LANG=id sudo ./status.sh`, or `echo id \| sudo tee /etc/vpn/lang`. |
+| Wrong language | Re-run `sudo ./menu.sh` → 17, or `VPN_LANG=zh sudo ./status.sh`, or `echo zh \| sudo tee /etc/vpn/lang`. |
 
 ---
 
@@ -360,7 +371,7 @@ sudo ./uninstall.sh
 - **Change default port:** edit `DEFAULT_PORT` in `install.sh`, or install with `--port <number>`.
 - **Change VPN subnet:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` in `install.sh` and `base_v4`/`base_v6` in `lib/wireguard.sh` (keep consistent in `wg_write_server_conf` and `wg_get_next_ip`).
 - **Change default DNS:** edit `DEFAULT_DNS` in `install.sh`.
-- **Change default language:** no code edit needed — use `--lang en|id`, `VPN_LANG=id`, or menu 17. File: `/etc/vpn/lang`.
+- **Change default language:** no code edit needed — use `--lang en|id|zh`, `VPN_LANG=zh`, or menu 17. File: `/etc/vpn/lang`.
 - **Change Xray/V2Ray version:** edit `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) in `lib/xray.sh` — check latest at [Xray-core releases](https://github.com/XTLS/Xray-core/releases) and [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
 - **Change Xray inbound ports:** edit `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY` in `lib/xray.sh` before install.
 - **Change REALITY SNI:** edit `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` in `lib/xray.sh` (needs: foreign domain, TLSv1.3 + H2, no redirect).
@@ -386,4 +397,4 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 Free for personal and commercial use. Provided "as is" without warranty. Ensure compliance with your network provider's laws/ToS when running a VPN service.
 
 ---
-Made by **wrwb Store** — v1.3 (Bilingual EN/ID, default English + 2-IP & 100-GB limits, 5-min auto-suspend).
+Made by **wrwb Store** — v1.4 (Trilingual EN/ID/ZH, default English + 2-IP & 100-GB limits, 5-min auto-suspend).

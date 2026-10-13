@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# lib/wireguard.sh — WireGuard core logic (server & client management, bilingual EN/ID)
+# lib/wireguard.sh — WireGuard core logic (server & client management, trilingual EN/ID/ZH)
 # Branding: wrwb Store
 #
 
@@ -25,13 +25,13 @@ wg_generate_server_keys() {
   local pub_file="$WG_DIR/server_public.key"
 
   if [[ ! -f "$priv_file" || ! -f "$pub_file" ]]; then
-    log_info "$(T "Generating a new server keypair..." "Membuat server keypair baru...")"
+    log_info "$(T "Generating a new server keypair..." "Membuat server keypair baru..." "正在生成新的服务器密钥对...")"
     wg genkey | tee "$priv_file" | wg pubkey > "$pub_file"
     chmod 600 "$priv_file"
     chmod 644 "$pub_file"
-    log_success "$(T "Server keypair created." "Server keypair berhasil dibuat.")"
+    log_success "$(T "Server keypair created." "Server keypair berhasil dibuat." "服务器密钥对已创建。")"
   else
-    log_info "$(T "Server keypair already exists, reusing it." "Server keypair sudah ada, menggunakan kunci yang sudah tersedia.")"
+    log_info "$(T "Server keypair already exists, reusing it." "Server keypair sudah ada, menggunakan kunci yang sudah tersedia." "服务器密钥对已存在，将重复使用。")"
   fi
 
   SERVER_PRIV_KEY="$(cat "$priv_file")"
@@ -46,13 +46,13 @@ wg_write_server_conf() {
   local srv_v4="${3:-10.66.66.1/24}"
   local srv_v6="${4:-fd42:42:42::1/64}"
 
-  log_step "$(T "Writing server config to $WG_CONF..." "Menulis konfigurasi server di $WG_CONF...")"
+  log_step "$(T "Writing server config to $WG_CONF..." "Menulis konfigurasi server di $WG_CONF..." "正在将服务器配置写入 $WG_CONF...")"
 
   # Back up the old config when present
   if [[ -f "$WG_CONF" ]]; then
     local bak="$WG_CONF.bak.$(date +%Y%m%d%H%M%S)"
     cp "$WG_CONF" "$bak"
-    log_info "$(T "Old config backed up to $bak" "Backup konfigurasi lama disimpan ke $bak")"
+    log_info "$(T "Old config backed up to $bak" "Backup konfigurasi lama disimpan ke $bak" "旧配置已备份到 $bak")"
   fi
 
   cat > "$WG_CONF" <<EOF
@@ -72,22 +72,22 @@ PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m con
 EOF
 
   chmod 600 "$WG_CONF"
-  log_success "$(T "WireGuard server config written." "Konfigurasi server WireGuard berhasil ditulis.")"
+  log_success "$(T "WireGuard server config written." "Konfigurasi server WireGuard berhasil ditulis." "WireGuard 服务器配置已写入。")"
 }
 
 # ----------------------------------------------------------- Systemd Service
 wg_enable_and_start() {
-  log_step "$(T "Enabling and starting WireGuard (wg-quick@wg0)..." "Mengaktifkan dan menjalankan layanan WireGuard (wg-quick@wg0)...")"
+  log_step "$(T "Enabling and starting WireGuard (wg-quick@wg0)..." "Mengaktifkan dan menjalankan layanan WireGuard (wg-quick@wg0)..." "正在启用并启动 WireGuard 服务（wg-quick@wg0）...")"
   systemctl daemon-reload 2>/dev/null || true
   systemctl enable wg-quick@wg0 >/dev/null 2>&1 || true
   systemctl restart wg-quick@wg0
 
   if systemctl is-active --quiet wg-quick@wg0; then
-    log_success "$(T "wg-quick@wg0 is active and running normally." "Layanan wg-quick@wg0 aktif dan berjalan normal.")"
+    log_success "$(T "wg-quick@wg0 is active and running normally." "Layanan wg-quick@wg0 aktif dan berjalan normal." "wg-quick@wg0 服务运行中，一切正常。")"
   else
-    log_error "$(T "wg-quick@wg0 failed to start. Systemd log:" "Layanan wg-quick@wg0 gagal berjalan. Log systemd:")"
+    log_error "$(T "wg-quick@wg0 failed to start. Systemd log:" "Layanan wg-quick@wg0 gagal berjalan. Log systemd:" "wg-quick@wg0 启动失败。Systemd 日志：")"
     journalctl -u wg-quick@wg0 -n 20 --no-pager || true
-    die "$(T "WireGuard failed to start." "Instalasi WireGuard gagal dijalankan.")"
+    die "$(T "WireGuard failed to start." "Instalasi WireGuard gagal dijalankan." "WireGuard 启动失败。")"
   fi
 }
 
@@ -136,7 +136,7 @@ wg_get_next_ip() {
   done
 
   if [[ "$next_host" -eq 0 ]]; then
-    die "$(T "Subnet 10.66.66.0/24 is full (253 clients registered). No IP available." "Subnet 10.66.66.0/24 penuh (253 client terdaftar). Tidak ada IP tersedia.")"
+    die "$(T "Subnet 10.66.66.0/24 is full (253 clients registered). No IP available." "Subnet 10.66.66.0/24 penuh (253 client terdaftar). Tidak ada IP tersedia." "子网 10.66.66.0/24 已满（已注册 253 个客户端）。没有可用 IP。")"
   fi
 
   CLIENT_IPV4="${base_v4}.${next_host}"
@@ -161,11 +161,11 @@ wg_create_client() {
   validate_client_name "$name"
 
   if wg_client_exists "$name"; then
-    die "$(T "A client named '$name' is already registered! Pick another name." "Client dengan nama '$name' sudah terdaftar! Pilih nama lain.")"
+    die "$(T "A client named '$name' is already registered! Pick another name." "Client dengan nama '$name' sudah terdaftar! Pilih nama lain." "名为 '$name' 的客户端已存在！请选择其他名称。")"
   fi
 
   wg_get_next_ip
-  log_info "$(T "Allocated IP for client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6" "Alokasi IP untuk client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6")"
+  log_info "$(T "Allocated IP for client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6" "Alokasi IP untuk client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6" "已为客户端 '$name' 分配 IP：IPv4=$CLIENT_IPV4，IPv6=$CLIENT_IPV6")"
 
   # Buat direktori client
   local c_dir="$CLIENTS_DIR/$name"
@@ -227,9 +227,9 @@ EOF
   local png_file="$c_dir/${name}.png"
   qrencode -t png -o "$png_file" < "$conf_file" 2>/dev/null || true
 
-  log_success "$(T "Client '$name' added!" "Client '$name' berhasil ditambahkan!")"
-  log_info "$(T "Config file : $conf_file" "File konfigurasi : $conf_file")"
-  [[ -f "$png_file" ]] && log_info "$(T "QR code image : $png_file" "QR code gambar   : $png_file")"
+  log_success "$(T "Client '$name' added!" "Client '$name' berhasil ditambahkan!" "客户端 '$name' 添加成功！")"
+  log_info "$(T "Config file : $conf_file" "File konfigurasi : $conf_file" "配置文件：$conf_file")"
+  [[ -f "$png_file" ]] && log_info "$(T "QR code image : $png_file" "QR code gambar   : $png_file" "二维码图片：$png_file")"
 
   LAST_CLIENT_CONF="$conf_file"
   LAST_CLIENT_PNG="$png_file"
@@ -240,9 +240,9 @@ wg_show_client_qr() {
   local conf_file="$1"
   [[ -f "$conf_file" ]] || return 1
   echo ""
-  echo "==================== $(T "SCAN QR CODE (FOR PHONES / TABLETS)" "SCAN QR CODE (UNTUK HP / TABLET)") ===================="
+  echo "==================== $(T "SCAN QR CODE (FOR PHONES / TABLETS)" "SCAN QR CODE (UNTUK HP / TABLET)" "扫描二维码（用于手机/平板）") ===================="
   qrencode -t ansiutf8 < "$conf_file" 2>/dev/null || {
-    log_warn "$(T "Cannot render the ANSI QR code in this terminal. Use the config file directly." "Tidak dapat menampilkan QR ANSI di terminal. Gunakan file konfigurasi langsung.")"
+    log_warn "$(T "Cannot render the ANSI QR code in this terminal. Use the config file directly." "Tidak dapat menampilkan QR ANSI di terminal. Gunakan file konfigurasi langsung." "无法在此终端显示 ANSI 二维码。请直接使用配置文件。")"
   }
   echo "=========================================================================="
   echo ""
@@ -253,10 +253,10 @@ wg_remove_client() {
   validate_client_name "$name"
 
   if ! wg_client_exists "$name"; then
-    die "$(T "Client '$name' was not found." "Client '$name' tidak ditemukan.")"
+    die "$(T "Client '$name' was not found." "Client '$name' tidak ditemukan." "未找到客户端 '$name'。")"
   fi
 
-  log_step "$(T "Removing client '$name'..." "Menghapus client '$name'...")"
+  log_step "$(T "Removing client '$name'..." "Menghapus client '$name'..." "正在删除客户端 '$name'...")"
 
   # Ambil public key client jika tersimpan di file atau di wg0.conf
   local pub_key=""
@@ -293,14 +293,14 @@ wg_remove_client() {
   # Re-apply when wg0 is running
   wg_reload_config
 
-  log_success "$(T "Client '$name' removed." "Client '$name' berhasil dihapus.")"
+  log_success "$(T "Client '$name' removed." "Client '$name' berhasil dihapus." "客户端 '$name' 已删除。")"
 }
 
 wg_list_clients() {
-  [[ -f "$WG_CONF" ]] || die "$(T "WireGuard is not configured yet. Run install.sh first." "WireGuard belum terkonfigurasi. Jalankan install.sh dulu.")"
+  [[ -f "$WG_CONF" ]] || die "$(T "WireGuard is not configured yet. Run install.sh first." "WireGuard belum terkonfigurasi. Jalankan install.sh dulu." "WireGuard 尚未配置。请先运行 install.sh。")"
 
   echo "======================================================================"
-  echo -e "${_C_BOLD}$(T "REGISTERED WIREGUARD CLIENTS" "DAFTAR CLIENT WIREGUARD TERDAFTAR")${_C_RESET}"
+  echo -e "${_C_BOLD}$(T "REGISTERED WIREGUARD CLIENTS" "DAFTAR CLIENT WIREGUARD TERDAFTAR" "已注册的 WIREGUARD 客户端列表")${_C_RESET}"
   echo "======================================================================"
   printf "%-18s %-20s %-25s\n" "CLIENT NAME" "IP ADDRESS" "STATUS / FILES"
   echo "----------------------------------------------------------------------"
@@ -318,8 +318,8 @@ wg_list_clients() {
     elif [[ "$line" =~ ^###\ End:\ (.*)$ ]]; then
       local cname="${BASH_REMATCH[1]}"
       local conf_path="$CLIENTS_DIR/$cname/${cname}.conf"
-      local status="$(T "conf present" "conf ada")"
-      [[ ! -f "$conf_path" ]] && status="$(T "conf missing" "conf hilang")"
+      local status="$(T "conf present" "conf ada" "配置存在")"
+      [[ ! -f "$conf_path" ]] && status="$(T "conf missing" "conf hilang" "配置缺失")"
       printf "%-18s %-20s %-25s\n" "$cname" "${current_ip:-N/A}" "$status"
       ((count++)) || true
       in_block=0
@@ -328,9 +328,9 @@ wg_list_clients() {
   done < "$WG_CONF"
 
   if [[ "$count" -eq 0 ]]; then
-    echo " ($(T "No clients registered yet" "Belum ada client yang terdaftar"))"
+    echo " ($(T "No clients registered yet" "Belum ada client yang terdaftar" "暂无已注册的客户端"))"
   fi
   echo "----------------------------------------------------------------------"
-  echo "$(T "Total clients: $count" "Total client: $count")"
+  echo "$(T "Total clients: $count" "Total client: $count" "客户端总数：$count")"
   echo "======================================================================"
 }
