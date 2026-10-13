@@ -1,10 +1,11 @@
 #!/bin/bash
 #
-# lib/wireguard.sh — Inti logika WireGuard (server & client management)
+# lib/wireguard.sh — WireGuard core logic (server & client management, bilingual EN/ID)
+# Branding: wrwb Store
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -24,13 +25,13 @@ wg_generate_server_keys() {
   local pub_file="$WG_DIR/server_public.key"
 
   if [[ ! -f "$priv_file" || ! -f "$pub_file" ]]; then
-    log_info "Membuat server keypair baru..."
+    log_info "$(T "Generating a new server keypair..." "Membuat server keypair baru...")"
     wg genkey | tee "$priv_file" | wg pubkey > "$pub_file"
     chmod 600 "$priv_file"
     chmod 644 "$pub_file"
-    log_success "Server keypair berhasil dibuat."
+    log_success "$(T "Server keypair created." "Server keypair berhasil dibuat.")"
   else
-    log_info "Server keypair sudah ada, menggunakan kunci yang sudah tersedia."
+    log_info "$(T "Server keypair already exists, reusing it." "Server keypair sudah ada, menggunakan kunci yang sudah tersedia.")"
   fi
 
   SERVER_PRIV_KEY="$(cat "$priv_file")"
@@ -45,13 +46,13 @@ wg_write_server_conf() {
   local srv_v4="${3:-10.66.66.1/24}"
   local srv_v6="${4:-fd42:42:42::1/64}"
 
-  log_step "Menulis konfigurasi server di $WG_CONF..."
+  log_step "$(T "Writing server config to $WG_CONF..." "Menulis konfigurasi server di $WG_CONF...")"
 
-  # Backup jika konfigurasi lama ada
+  # Back up the old config when present
   if [[ -f "$WG_CONF" ]]; then
     local bak="$WG_CONF.bak.$(date +%Y%m%d%H%M%S)"
     cp "$WG_CONF" "$bak"
-    log_info "Backup konfigurasi lama disimpan ke $bak"
+    log_info "$(T "Old config backed up to $bak" "Backup konfigurasi lama disimpan ke $bak")"
   fi
 
   cat > "$WG_CONF" <<EOF
@@ -71,22 +72,22 @@ PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m con
 EOF
 
   chmod 600 "$WG_CONF"
-  log_success "Konfigurasi server WireGuard berhasil ditulis."
+  log_success "$(T "WireGuard server config written." "Konfigurasi server WireGuard berhasil ditulis.")"
 }
 
 # ----------------------------------------------------------- Systemd Service
 wg_enable_and_start() {
-  log_step "Mengaktifkan dan menjalankan layanan WireGuard (wg-quick@wg0)..."
+  log_step "$(T "Enabling and starting WireGuard (wg-quick@wg0)..." "Mengaktifkan dan menjalankan layanan WireGuard (wg-quick@wg0)...")"
   systemctl daemon-reload 2>/dev/null || true
   systemctl enable wg-quick@wg0 >/dev/null 2>&1 || true
   systemctl restart wg-quick@wg0
 
   if systemctl is-active --quiet wg-quick@wg0; then
-    log_success "Layanan wg-quick@wg0 aktif dan berjalan normal."
+    log_success "$(T "wg-quick@wg0 is active and running normally." "Layanan wg-quick@wg0 aktif dan berjalan normal.")"
   else
-    log_error "Layanan wg-quick@wg0 gagal berjalan. Log systemd:"
+    log_error "$(T "wg-quick@wg0 failed to start. Systemd log:" "Layanan wg-quick@wg0 gagal berjalan. Log systemd:")"
     journalctl -u wg-quick@wg0 -n 20 --no-pager || true
-    die "Instalasi WireGuard gagal dijalankan."
+    die "$(T "WireGuard failed to start." "Instalasi WireGuard gagal dijalankan.")"
   fi
 }
 
@@ -135,7 +136,7 @@ wg_get_next_ip() {
   done
 
   if [[ "$next_host" -eq 0 ]]; then
-    die "Subnet 10.66.66.0/24 penuh (253 client terdaftar). Tidak ada IP tersedia."
+    die "$(T "Subnet 10.66.66.0/24 is full (253 clients registered). No IP available." "Subnet 10.66.66.0/24 penuh (253 client terdaftar). Tidak ada IP tersedia.")"
   fi
 
   CLIENT_IPV4="${base_v4}.${next_host}"
@@ -160,11 +161,11 @@ wg_create_client() {
   validate_client_name "$name"
 
   if wg_client_exists "$name"; then
-    die "Client dengan nama '$name' sudah terdaftar! Pilih nama lain."
+    die "$(T "A client named '$name' is already registered! Pick another name." "Client dengan nama '$name' sudah terdaftar! Pilih nama lain.")"
   fi
 
   wg_get_next_ip
-  log_info "Alokasi IP untuk client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6"
+  log_info "$(T "Allocated IP for client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6" "Alokasi IP untuk client '$name': IPv4=$CLIENT_IPV4, IPv6=$CLIENT_IPV6")"
 
   # Buat direktori client
   local c_dir="$CLIENTS_DIR/$name"
@@ -226,9 +227,9 @@ EOF
   local png_file="$c_dir/${name}.png"
   qrencode -t png -o "$png_file" < "$conf_file" 2>/dev/null || true
 
-  log_success "Client '$name' berhasil ditambahkan!"
-  log_info "File konfigurasi : $conf_file"
-  [[ -f "$png_file" ]] && log_info "QR code gambar   : $png_file"
+  log_success "$(T "Client '$name' added!" "Client '$name' berhasil ditambahkan!")"
+  log_info "$(T "Config file : $conf_file" "File konfigurasi : $conf_file")"
+  [[ -f "$png_file" ]] && log_info "$(T "QR code image : $png_file" "QR code gambar   : $png_file")"
 
   LAST_CLIENT_CONF="$conf_file"
   LAST_CLIENT_PNG="$png_file"
@@ -239,9 +240,9 @@ wg_show_client_qr() {
   local conf_file="$1"
   [[ -f "$conf_file" ]] || return 1
   echo ""
-  echo "==================== SCAN QR CODE (UNTUK HP / TABLET) ===================="
+  echo "==================== $(T "SCAN QR CODE (FOR PHONES / TABLETS)" "SCAN QR CODE (UNTUK HP / TABLET)") ===================="
   qrencode -t ansiutf8 < "$conf_file" 2>/dev/null || {
-    log_warn "Tidak dapat menampilkan QR ANSI di terminal. Gunakan file konfigurasi langsung."
+    log_warn "$(T "Cannot render the ANSI QR code in this terminal. Use the config file directly." "Tidak dapat menampilkan QR ANSI di terminal. Gunakan file konfigurasi langsung.")"
   }
   echo "=========================================================================="
   echo ""
@@ -252,10 +253,10 @@ wg_remove_client() {
   validate_client_name "$name"
 
   if ! wg_client_exists "$name"; then
-    die "Client '$name' tidak ditemukan."
+    die "$(T "Client '$name' was not found." "Client '$name' tidak ditemukan.")"
   fi
 
-  log_step "Menghapus client '$name'..."
+  log_step "$(T "Removing client '$name'..." "Menghapus client '$name'...")"
 
   # Ambil public key client jika tersimpan di file atau di wg0.conf
   local pub_key=""
@@ -289,17 +290,17 @@ wg_remove_client() {
     rm -rf "$c_dir"
   fi
 
-  # Terapkan ulang jika wg0 berjalan
+  # Re-apply when wg0 is running
   wg_reload_config
 
-  log_success "Client '$name' berhasil dihapus."
+  log_success "$(T "Client '$name' removed." "Client '$name' berhasil dihapus.")"
 }
 
 wg_list_clients() {
-  [[ -f "$WG_CONF" ]] || die "WireGuard belum terkonfigurasi. Jalankan install.sh dulu."
+  [[ -f "$WG_CONF" ]] || die "$(T "WireGuard is not configured yet. Run install.sh first." "WireGuard belum terkonfigurasi. Jalankan install.sh dulu.")"
 
   echo "======================================================================"
-  echo -e "${_C_BOLD}DAFTAR CLIENT WIREGUARD TERDAFTAR${_C_RESET}"
+  echo -e "${_C_BOLD}$(T "REGISTERED WIREGUARD CLIENTS" "DAFTAR CLIENT WIREGUARD TERDAFTAR")${_C_RESET}"
   echo "======================================================================"
   printf "%-18s %-20s %-25s\n" "CLIENT NAME" "IP ADDRESS" "STATUS / FILES"
   echo "----------------------------------------------------------------------"
@@ -317,8 +318,8 @@ wg_list_clients() {
     elif [[ "$line" =~ ^###\ End:\ (.*)$ ]]; then
       local cname="${BASH_REMATCH[1]}"
       local conf_path="$CLIENTS_DIR/$cname/${cname}.conf"
-      local status="conf ada"
-      [[ ! -f "$conf_path" ]] && status="conf hilang"
+      local status="$(T "conf present" "conf ada")"
+      [[ ! -f "$conf_path" ]] && status="$(T "conf missing" "conf hilang")"
       printf "%-18s %-20s %-25s\n" "$cname" "${current_ip:-N/A}" "$status"
       ((count++)) || true
       in_block=0
@@ -327,9 +328,9 @@ wg_list_clients() {
   done < "$WG_CONF"
 
   if [[ "$count" -eq 0 ]]; then
-    echo " (Belum ada client yang terdaftar)"
+    echo " ($(T "No clients registered yet" "Belum ada client yang terdaftar"))"
   fi
   echo "----------------------------------------------------------------------"
-  echo "Total client: $count"
+  echo "$(T "Total clients: $count" "Total client: $count")"
   echo "======================================================================"
 }

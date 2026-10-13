@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
-#  list-clients.sh — Menampilkan Daftar Client WireGuard & Status Koneksi
-#  Penggunaan:
+#  list-clients.sh — List WireGuard clients & connection status (bilingual EN/ID)
+#  Usage:
 #    sudo ./list-clients.sh
 # ==============================================================================
 
@@ -18,15 +18,15 @@ need_root
 load_params
 
 echo "================================================================================"
-echo -e "${_C_BOLD}DAFTAR CLIENT WIREGUARD & STATUS KONEKSI${_C_RESET}"
+echo -e "${_C_BOLD}$(T "WIREGUARD CLIENT LIST & CONNECTION STATUS" "DAFTAR CLIENT WIREGUARD & STATUS KONEKSI")${_C_RESET}"
 echo "================================================================================"
 
 if [[ ! -f "$WG_CONF" ]]; then
-  die "Konfigurasi $WG_CONF tidak ditemukan. WireGuard belum terpasang."
+  die "$(T "Config $WG_CONF not found. WireGuard is not installed yet." "Konfigurasi $WG_CONF tidak ditemukan. WireGuard belum terpasang.")"
 fi
 
-# Parsing data client dari wg0.conf
-# Ambil nama, allowed IPs, dan public key
+# Parse client data from wg0.conf
+# Collect name, allowed IPs, and public key
 declare -A CLIENT_PUBKEYS
 declare -A CLIENT_IPS
 CLIENT_NAMES=()
@@ -51,12 +51,12 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$WG_CONF"
 
 if [[ ${#CLIENT_NAMES[@]} -eq 0 ]]; then
-  echo "Belum ada client yang terdaftar."
-  echo "Jalankan 'sudo ./add-client.sh' untuk membuat client pertama."
+  echo "$(T "No clients registered yet." "Belum ada client yang terdaftar.")"
+  echo "$(T "Run 'sudo ./add-client.sh' to create the first client." "Jalankan 'sudo ./add-client.sh' untuk membuat client pertama.")"
   exit 0
 fi
 
-# Ambil dump runtime wg jika aktif
+# Grab runtime wg dump when active
 WG_DUMP=""
 if systemctl is-active --quiet wg-quick@wg0 && command -v wg &>/dev/null; then
   WG_DUMP="$(wg show wg0 dump 2>/dev/null || true)"
@@ -78,38 +78,38 @@ human_bytes() {
 human_time() {
   local epoch="${1:-0}"
   if [[ "$epoch" -eq 0 ]]; then
-    echo "Belum pernah"
+    echo "$(T "Never" "Belum pernah")"
     return
   fi
   local now diff
   now="$(date +%s)"
   diff=$((now - epoch))
   if [[ "$diff" -lt 60 ]]; then
-    echo "${diff} detik lalu"
+    echo "$(T "${diff}s ago" "${diff} detik lalu")"
   elif [[ "$diff" -lt 3600 ]]; then
-    echo "$((diff / 60)) menit lalu"
+    echo "$(T "$((diff / 60))m ago" "$((diff / 60)) menit lalu")"
   elif [[ "$diff" -lt 86400 ]]; then
-    echo "$((diff / 3600)) jam lalu"
+    echo "$(T "$((diff / 3600))h ago" "$((diff / 3600)) jam lalu")"
   else
-    echo "$((diff / 86400)) hari lalu"
+    echo "$(T "$((diff / 86400))d ago" "$((diff / 86400)) hari lalu")"
   fi
 }
 
-printf "%-16s %-16s %-16s %-12s %-12s\n" "NAMA CLIENT" "IP CLIENT" "TERAKHIR KONEK" "DOWNLOAD" "UPLOAD"
+printf "%-16s %-16s %-16s %-12s %-12s\n" "$(T "CLIENT NAME" "NAMA CLIENT")" "$(T "CLIENT IP" "IP CLIENT")" "$(T "LAST SEEN" "TERAKHIR KONEK")" "DOWNLOAD" "UPLOAD"
 echo "--------------------------------------------------------------------------------"
 
 for name in "${CLIENT_NAMES[@]}"; do
   ip="${CLIENT_IPS[$name]:-N/A}"
   pub="${CLIENT_PUBKEYS[$name]:-}"
-  # potong prefix subnet IPv4 saja agar rapi
+  # trim to the IPv4 prefix only for a tidy table
   ip_short="$(echo "$ip" | cut -d, -f1 | tr -d ' ')"
 
-  last_seen="Belum pernah"
+  last_seen="$(T "Never" "Belum pernah")"
   rx_str="0 B"
   tx_str="0 B"
 
   if [[ -n "$WG_DUMP" && -n "$pub" ]]; then
-    # format wg show dump:
+    # wg show dump format:
     # public-key preshared-key endpoint allowed-ips latest-handshake rx-bytes tx-bytes persistent-keepalive
     peer_line="$(echo "$WG_DUMP" | grep "^${pub}" || true)"
     if [[ -n "$peer_line" ]]; then
@@ -129,7 +129,7 @@ for name in "${CLIENT_NAMES[@]}"; do
 done
 
 echo "--------------------------------------------------------------------------------"
-echo "Total client terdaftar: ${#CLIENT_NAMES[@]}"
-echo "Lokasi folder konfigurasi: $CLIENTS_DIR/<nama_client>/"
-echo "Tampilkan QR code lagi : sudo ./show-qr.sh <nama_client>"
+echo "$(T "Total registered clients: ${#CLIENT_NAMES[@]}" "Total client terdaftar: ${#CLIENT_NAMES[@]}")"
+echo "$(T "Config folder location: $CLIENTS_DIR/<client_name>/" "Lokasi folder konfigurasi: $CLIENTS_DIR/<nama_client>/")"
+echo "$(T "Show QR code again  : sudo ./show-qr.sh <client_name>" "Tampilkan QR code lagi : sudo ./show-qr.sh <nama_client>")"
 echo "================================================================================"

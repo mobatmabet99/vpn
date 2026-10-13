@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# lib/shadowsocks.sh — Modul opsional Shadowsocks (ssservice / shadowsocks-rust)
-# Auto-generate password, AEAD cipher, QR code & URI ss://
+# lib/shadowsocks.sh — Optional Shadowsocks module (ssserver / shadowsocks-rust, bilingual EN/ID)
+# Auto-generates password, AEAD cipher, QR code & ss:// URI
+# Branding: wrwb Store
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -13,17 +14,17 @@ SS_CONFIG_DIR="/etc/shadowsocks"
 SS_CONFIG_FILE="$SS_CONFIG_DIR/config.json"
 SS_PARAMS="/etc/shadowsocks/params"
 
-# Versi stabil shadowsocks-rust (cek terbaru di
+# Stable shadowsocks-rust version (check latest at
 # https://github.com/shadowsocks/shadowsocks-rust/releases).
-# Diperbarui berkala agar koneksi memakai build paling efisien & aman.
+# Updated regularly so connections use the most efficient & secure build.
 SS_VERSION_DEFAULT="v1.25.0"
 
-# Cipher AEAD default — paling efisien & didukung luas oleh semua client modern.
-# Alternatif hemat CPU untuk perangkat/VM kecil: "2022-blake3-aes-128-gcm".
+# Default AEAD cipher — most efficient & widely supported by all modern clients.
+# Low-CPU alternative for small devices/VMs: "2022-blake3-aes-128-gcm".
 SS_METHOD_DEFAULT="2022-blake3-aes-256-gcm"
 
 install_shadowsocks_binary() {
-  log_step "Mengunduh dan menyiapkan Shadowsocks-rust server..."
+  log_step "$(T "Downloading and preparing the Shadowsocks-rust server..." "Mengunduh dan menyiapkan Shadowsocks-rust server...")"
 
   local arch
   arch="$(uname -m)"
@@ -32,7 +33,7 @@ install_shadowsocks_binary() {
     x86_64|amd64) target_arch="x86_64-unknown-linux-gnu" ;;
     aarch64|arm64) target_arch="aarch64-unknown-linux-gnu" ;;
     armv7l|armhf) target_arch="armv7-unknown-linux-gnueabihf" ;;
-    *) die "Arsitektur CPU '$arch' belum didukung otomatis untuk Shadowsocks binary." ;;
+    *) die "$(T "CPU architecture '$arch' is not supported automatically for the Shadowsocks binary." "Arsitektur CPU '$arch' belum didukung otomatis untuk Shadowsocks binary.")" ;;
   esac
 
   mkdir -p "$SS_CONFIG_DIR" /usr/local/bin
@@ -43,26 +44,26 @@ install_shadowsocks_binary() {
     local ss_ver="$SS_VER_LABEL"
     local ss_url="https://github.com/shadowsocks/shadowsocks-rust/releases/download/${ss_ver}/shadowsocks-${ss_ver}.${target_arch}.tar.xz"
 
-    log_info "Mengunduh shadowsocks-rust ($ss_ver) dari GitHub..."
+    log_info "$(T "Downloading shadowsocks-rust ($ss_ver) from GitHub..." "Mengunduh shadowsocks-rust ($ss_ver) dari GitHub...")"
     local tmp_tar
     tmp_tar="$(mktemp --suffix=.tar.xz)"
     if curl -fsSL "$ss_url" -o "$tmp_tar"; then
       tar -xJf "$tmp_tar" -C /usr/local/bin ssserver 2>/dev/null || tar -xvf "$tmp_tar" -C /usr/local/bin ssserver
       chmod 755 /usr/local/bin/ssserver
       rm -f "$tmp_tar"
-      log_success "ssserver berhasil dipasang di /usr/local/bin/ssserver"
+      log_success "$(T "ssserver installed at /usr/local/bin/ssserver" "ssserver berhasil dipasang di /usr/local/bin/ssserver")"
     else
       rm -f "$tmp_tar"
-      # Fallback ke apt/dnf package jika download gagal
-      log_warn "Download binary gagal, mencoba package manager distro..."
+      # Fall back to the distro package manager when the download fails
+      log_warn "$(T "Binary download failed, trying the distro package manager..." "Download binary gagal, mencoba package manager distro...")"
       if command -v apt-get &>/dev/null; then
-        apt-get install -y shadowsocks-libev || die "Gagal memasang Shadowsocks."
+        apt-get install -y shadowsocks-libev || die "$(T "Failed to install Shadowsocks." "Gagal memasang Shadowsocks.")"
       elif command -v dnf &>/dev/null; then
-        dnf install -y shadowsocks-libev || die "Gagal memasang Shadowsocks."
+        dnf install -y shadowsocks-libev || die "$(T "Failed to install Shadowsocks." "Gagal memasang Shadowsocks.")"
       fi
     fi
   else
-    log_info "ssserver sudah terpasang di sistem."
+    log_info "$(T "ssserver is already installed on the system." "ssserver sudah terpasang di sistem.")"
   fi
 }
 
@@ -74,7 +75,7 @@ ss_setup_server() {
 
   install_shadowsocks_binary
 
-  log_step "Membuat konfigurasi server Shadowsocks..."
+  log_step "$(T "Creating the Shadowsocks server config..." "Membuat konfigurasi server Shadowsocks...")"
   cat > "$SS_CONFIG_FILE" <<EOF
 {
     "server": "::",
@@ -110,11 +111,11 @@ EOF
   systemctl enable shadowsocks-rust.service
   systemctl restart shadowsocks-rust.service
 
-  # Buka firewall TCP & UDP
+  # Open TCP & UDP in the firewall
   open_firewall_port "$port" "tcp"
   open_firewall_port "$port" "udp"
 
-  # Simpan parameter
+  # Save parameters
   cat > "$SS_PARAMS" <<EOF
 SS_PUB_IP="$pub_ip"
 SS_PORT="$port"
@@ -123,22 +124,22 @@ SS_METHOD="$method"
 EOF
   chmod 600 "$SS_PARAMS"
 
-  log_success "Shadowsocks aktif di port $port (metode: $method)"
+  log_success "$(T "Shadowsocks is active on port $port (method: $method)" "Shadowsocks aktif di port $port (metode: $method)")"
 
-  # Buat URI Shadowsocks format SIP002: ss://base64(method:password@host:port)#tag
+  # Build the SIP002 Shadowsocks URI: ss://base64(method:password@host:port)#tag
   local userinfo
   userinfo="$(echo -n "${method}:${password}" | base64 -w 0 2>/dev/null || echo -n "${method}:${password}" | base64)"
   local ss_uri="ss://${userinfo}@${pub_ip}:${port}#VPN-Shadowsocks"
 
   echo ""
   echo "==================== SHADOWSOCKS CONNECTION ===================="
-  echo "URI Client : $ss_uri"
-  echo "Metode     : $method"
-  echo "Port       : $port"
+  echo "$(T "Client URI : $ss_uri" "URI Client : $ss_uri")"
+  echo "$(T "Method     : $method" "Metode     : $method")"
+  echo "$(T "Port       : $port" "Port       : $port")"
   echo "Password   : $password"
   echo "----------------------------------------------------------------"
   if command -v qrencode &>/dev/null; then
-    echo "Scan QR Code Shadowsocks:"
+    echo "$(T "Scan the Shadowsocks QR code:" "Scan QR Code Shadowsocks:")"
     qrencode -t ansiutf8 "$ss_uri" || true
   fi
   echo "================================================================="

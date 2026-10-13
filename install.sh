@@ -1,18 +1,32 @@
 #!/bin/bash
 # ==============================================================================
-#  install.sh — Skrip Otomatisasi Instalasi VPN WireGuard
-#  Mendukung:
-#    - Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS (dan versi seterusnya)
+#  install.sh — Automated VPN installer (WireGuard engine, bilingual EN/ID)
+#  Supports:
+#    - Ubuntu 20.04 / 22.04 / 24.04 / 26.04 LTS (and later)
 #    - Debian 10 (Buster) / 11 (Bullseye) / 12 (Bookworm) / 13 (Trixie)
 #    - CentOS / Rocky Linux / AlmaLinux 8 / 9
 #    - RHEL 8 / 9 & Fedora
+#  Branding: wrwb Store
 # ==============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Muat modul pendukung
+# Pre-scan --lang <en|id> so the language framework knows the choice
+# before any module prints output (default: en).
+_prev_arg=""
+for _a in "$@"; do
+  case "$_a" in
+    --lang=*) VPN_LANG_CLI="${_a#--lang=}" ;;
+    *) if [[ "$_prev_arg" == "--lang" ]]; then VPN_LANG_CLI="$_a"; fi ;;
+  esac
+  _prev_arg="$_a"
+done
+unset _a _prev_arg
+export VPN_LANG_CLI="${VPN_LANG_CLI:-}"
+
+# Load support modules
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
@@ -30,40 +44,41 @@ source "$SCRIPT_DIR/lib/xray.sh"
 # shellcheck source=lib/limits.sh
 source "$SCRIPT_DIR/lib/limits.sh"
 
-# Default Konfigurasi
+# Default configuration
 DEFAULT_PORT="51820"
 DEFAULT_DNS="1.1.1.1, 1.0.0.1"
 DEFAULT_CLIENT="client1"
 DEFAULT_SUBNET="10.66.66.0/24"
 DEFAULT_SERVER_IP="10.66.66.1"
 
-# Banner
+# Banner (bilingual, printed after language selection)
 print_banner() {
   cat <<'EOF'
  ================================================================
-    __     ______  _   _    ___           _        _ _           
-    \ \   / /  _ \| \ | |  |_ _|_ __  ___| |_ __ _| | | ___ _ __ 
+    __     ______  _   _    ___           _        _ _
+    \ \   / /  _ \| \ | |  |_ _|_ __  ___| |_ __ _| | | ___ _ __
      \ \ / /| |_) |  \| |   | || '_ \/ __| __/ _` | | |/ _ \ '__|
-      \ V / |  __/| |\  |   | || | | \__ \ || (_| | | |  __/ |   
-       \_/  |_|   |_| \_|  |___|_| |_|___/\__\__,_|_|_|\___|_|   
-                                                                 
-    Otomatisasi Instalasi VPN Multi-Distro (WireGuard Engine)
-    Dibuat oleh wrwb Store - Limit 2 IP & 100GB Default
- ================================================================
+      \ V / |  __/| |\  |   | || | | \__ \ || (_| | | |  __/ |
+       \_/  |_|   |_| \_|  |___|_| |_|___/\__\__,_|_|_|\___|_|
+
 EOF
+  echo "    $(T "Multi-Distro VPN Auto-Installer (WireGuard Engine)" "Otomatisasi Instalasi VPN Multi-Distro (WireGuard Engine)")"
+  echo "    $(T "by wrwb Store - Default limit 2 IPs & 100GB" "Dibuat oleh wrwb Store - Limit 2 IP & 100GB Default")"
+  echo "    $(lang_label)"
+  echo " ================================================================"
 }
 
-# Parsing Argumen Baris Perintah
+# Command-line argument parsing
 CLI_PORT=""
 CLI_CLIENT=""
 CLI_DNS=""
 CLI_YES=0
 WITH_OPENVPN=0
 WITH_SHADOWSOCKS=0
-# SSH & Xray aktif default — bisa dimatikan eksplisit via --no-ssh / --no-xray
+# SSH & Xray enabled by default — can be disabled explicitly via --no-ssh / --no-xray
 WITH_SSH=1
 WITH_XRAY=1
-# Engine tunnel: "xray" (default, XTLS+REALITY) atau "v2ray"
+# Tunnel engine: "xray" (default, XTLS+REALITY) or "v2ray"
 XRAY_ENGINE="${XRAY_ENGINE:-xray}"
 
 parse_args() {
@@ -77,6 +92,10 @@ parse_args() {
         CLI_DNS="$2"; shift 2 ;;
       -y|--yes)
         CLI_YES=1; AUTO_YES=1; shift ;;
+      --lang)
+        VPN_LANG_CLI="$2"; shift 2 ;;
+      --lang=*)
+        VPN_LANG_CLI="${1#--lang=}"; shift ;;
       --with-openvpn)
         WITH_OPENVPN=1; WITH_SSH=0; shift ;;
       --with-ssh)
@@ -92,74 +111,84 @@ parse_args() {
       --no-xray)
         WITH_XRAY=0; shift ;;
       -h|--help)
-        echo "Penggunaan: sudo ./install.sh [opsi]"
-        echo "Opsi:"
-        echo "  -p, --port <port>          Port WireGuard (default: 51820)"
-        echo "  -c, --client <nama>        Nama client pertama (default: client1)"
-        echo "  -d, --dns <ip1,ip2>        DNS Server (default: 1.1.1.1, 1.0.0.1)"
-        echo "  -y, --yes                  Mode non-interaktif (gunakan nilai default)"
-        echo "      --with-ssh             Pasang SSH VPN (DEFAULT AKTIF)"
-        echo "      --with-openvpn         Pasang OpenVPN (pengganti SSH, saling eksklusif)"
-        echo "      --no-ssh               Jangan pasang SSH maupun OpenVPN"
-        echo "      --with-xray            Pasang Xray-core (DEFAULT AKTIF)"
-        echo "      --with-v2ray           Pasang v2ray-core (pengganti Xray)"
-        echo "      --no-xray              Jangan pasang Xray/V2Ray"
-        echo "      --with-shadowsocks     Sekaligus instal Shadowsocks"
-        echo "  -h, --help                 Tampilkan bantuan ini"
+        echo "$(T "Usage: sudo ./install.sh [options]" "Penggunaan: sudo ./install.sh [opsi]")"
+        echo "$(T "Options:" "Opsi:")"
+        echo "  -p, --port <port>          $(T "WireGuard port (default: 51820)" "Port WireGuard (default: 51820)")"
+        echo "  -c, --client <name>        $(T "First client name (default: client1)" "Nama client pertama (default: client1)")"
+        echo "  -d, --dns <ip1,ip2>        $(T "DNS servers (default: 1.1.1.1, 1.0.0.1)" "DNS Server (default: 1.1.1.1, 1.0.0.1)")"
+        echo "  -y, --yes                  $(T "Non-interactive mode (use defaults)" "Mode non-interaktif (gunakan nilai default)")"
+        echo "      --lang <en|id>         $(T "Installer language (default: en)" "Bahasa instalasi (default: en)")"
+        echo "      --with-ssh             $(T "Install SSH VPN (DEFAULT ON)" "Pasang SSH VPN (DEFAULT AKTIF)")"
+        echo "      --with-openvpn         $(T "Install OpenVPN (replaces SSH, mutually exclusive)" "Pasang OpenVPN (pengganti SSH, saling eksklusif)")"
+        echo "      --no-ssh               $(T "Install neither SSH nor OpenVPN" "Jangan pasang SSH maupun OpenVPN")"
+        echo "      --with-xray            $(T "Install Xray-core (DEFAULT ON)" "Pasang Xray-core (DEFAULT AKTIF)")"
+        echo "      --with-v2ray           $(T "Install v2ray-core (replaces Xray)" "Pasang v2ray-core (pengganti Xray)")"
+        echo "      --no-xray              $(T "Install neither Xray nor V2Ray" "Jangan pasang Xray/V2Ray")"
+        echo "      --with-shadowsocks     $(T "Also install Shadowsocks" "Sekaligus instal Shadowsocks")"
+        echo "  -h, --help                 $(T "Show this help" "Tampilkan bantuan ini")"
         echo ""
-        echo "Contoh:"
+        echo "$(T "Examples:" "Contoh:")"
         echo "  sudo ./install.sh --yes                                   # default: WG + SSH + Xray"
+        echo "  sudo ./install.sh --lang id --yes                         # installer in Indonesian"
         echo "  sudo ./install.sh --with-openvpn --with-v2ray --yes       # WG + OpenVPN + V2Ray"
-        echo "  XRAY_ENGINE=v2ray sudo ./install.sh --yes                 # pilih engine via env"
+        echo "  XRAY_ENGINE=v2ray sudo ./install.sh --yes                 # select engine via env"
         exit 0
         ;;
       *)
-        die "Opsi tidak dikenal: $1. Gunakan --help untuk bantuan."
+        die "$(T "Unknown option: $1. Use --help for help." "Opsi tidak dikenal: $1. Gunakan --help untuk bantuan.")"
         ;;
     esac
   done
+  # Refresh language now that CLI flags are known (--lang may appear anywhere)
+  lang_load
 }
 
 main() {
-  print_banner
   parse_args "$@"
 
-  # 1. Validasi Akses Root
+  # 1. Root access validation
   need_root
 
-  # 2. Periksa Perangkat TUN
+  # 2. Language selection (interactive only; default English).
+  #    --lang en|id, VPN_LANG env, or saved /etc/vpn/lang wins silently.
+  lang_ask
+  lang_save
+
+  print_banner
+
+  # 3. TUN device check
   check_tun
   check_virt
 
-  # 3. Validasi & Deteksi OS
+  # 4. OS validation & detection
   check_os_supported
 
-  # Cek apakah WireGuard sudah terpasang sebelumnya
+  # Check whether WireGuard was already installed
   if [[ -f /etc/wireguard/params && -f /etc/wireguard/wg0.conf ]]; then
-    log_warn "WireGuard sepertinya sudah terpasang di sistem ini."
+    log_warn "$(T "WireGuard seems to be already installed on this system." "WireGuard sepertinya sudah terpasang di sistem ini.")"
     if [[ "$CLI_YES" -eq 0 ]]; then
-      echo "Pilihan:"
-      echo "  1) Tambah client baru (add-client.sh)"
-      echo "  2) Instal ulang / Re-install bersih"
-      echo "  3) Keluar"
-      read -rp "Pilih [1-3] (default 1): " ex_choice
+      echo "$(T "Options:" "Pilihan:")"
+      echo "  1) $(T "Add a new client (add-client.sh)" "Tambah client baru (add-client.sh)")"
+      echo "  2) $(T "Clean re-install" "Instal ulang / Re-install bersih")"
+      echo "  3) $(T "Exit" "Keluar")"
+      read -rp "$(T "Choose [1-3] (default 1): " "Pilih [1-3] (default 1): ")" ex_choice
       ex_choice="${ex_choice:-1}"
       case "$ex_choice" in
         1) exec "$SCRIPT_DIR/add-client.sh" ;;
-        2) log_warn "Melanjutkan instal ulang WireGuard..." ;;
+        2) log_warn "$(T "Continuing with a clean WireGuard re-install..." "Melanjutkan instal ulang WireGuard...")" ;;
         *) exit 0 ;;
       esac
     fi
   fi
 
-  # 4. Deteksi Parameter Jaringan
-  log_step "Mendeteksi antarmuka jaringan dan IP publik..."
+  # 5. Network parameter detection
+  log_step "$(T "Detecting network interface and public IP..." "Mendeteksi antarmuka jaringan dan IP publik...")"
   NET_IFACE="$(get_default_iface)"
   SERVER_PUB_IP="$(get_public_ip)"
-  log_info "Antarmuka publik : $NET_IFACE"
-  log_info "IP Publik server : $SERVER_PUB_IP"
+  log_info "$(T "Public interface : $NET_IFACE" "Antarmuka publik : $NET_IFACE")"
+  log_info "$(T "Server public IP : $SERVER_PUB_IP" "IP Publik server : $SERVER_PUB_IP")"
 
-  # 5. Tanya Parameter (atau gunakan CLI / default)
+  # 6. Ask parameters (or use CLI / defaults)
   if [[ "$CLI_YES" -eq 1 ]]; then
     SERVER_PORT="${CLI_PORT:-$DEFAULT_PORT}"
     SERVER_DNS="${CLI_DNS:-$DEFAULT_DNS}"
@@ -167,43 +196,43 @@ main() {
   else
     # Port
     echo ""
-    read -rp "Port WireGuard [$DEFAULT_PORT]: " input_port
+    read -rp "$(T "WireGuard port [$DEFAULT_PORT]: " "Port WireGuard [$DEFAULT_PORT]: ")" input_port
     SERVER_PORT="${input_port:-$DEFAULT_PORT}"
-    [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] && [[ "$SERVER_PORT" -ge 1 && "$SERVER_PORT" -le 65535 ]] || die "Port harus berupa angka antara 1-65535."
+    [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] && [[ "$SERVER_PORT" -ge 1 && "$SERVER_PORT" -le 65535 ]] || die "$(T "Port must be a number between 1-65535." "Port harus berupa angka antara 1-65535.")"
 
     # DNS
     echo ""
-    echo "Pilihan DNS Server:"
-    echo "  1) Cloudflare (1.1.1.1, 1.0.0.1) - Cepat & Privasi (Rekomendasi)"
+    echo "$(T "DNS server choices:" "Pilihan DNS Server:")"
+    echo "  1) Cloudflare (1.1.1.1, 1.0.0.1) - $(T "Fast & private (Recommended)" "Cepat & Privasi (Rekomendasi)")"
     echo "  2) Google (8.8.8.8, 8.8.4.4)"
-    echo "  3) AdGuard DNS (94.140.14.14 - Blokir Iklan)"
-    echo "  4) Kustom"
-    read -rp "Pilih DNS [1-4] (default 1): " dns_choice
+    echo "  3) AdGuard DNS (94.140.14.14 - $(T "Blocks ads" "Blokir Iklan"))"
+    echo "  4) $(T "Custom" "Kustom")"
+    read -rp "$(T "Choose DNS [1-4] (default 1): " "Pilih DNS [1-4] (default 1): ")" dns_choice
     case "${dns_choice:-1}" in
       1) SERVER_DNS="1.1.1.1, 1.0.0.1" ;;
       2) SERVER_DNS="8.8.8.8, 8.8.4.4" ;;
       3) SERVER_DNS="94.140.14.14, 94.140.15.15" ;;
       4)
-        read -rp "Masukkan IP DNS (pisahkan koma): " custom_dns
+        read -rp "$(T "Enter DNS IPs (comma separated): " "Masukkan IP DNS (pisahkan koma): ")" custom_dns
         SERVER_DNS="${custom_dns:-1.1.1.1}"
         ;;
       *) SERVER_DNS="1.1.1.1, 1.0.0.1" ;;
     esac
 
-    # Nama Client Pertama
+    # First client name
     echo ""
-    read -rp "Nama client pertama [$DEFAULT_CLIENT]: " input_client
+    read -rp "$(T "First client name [$DEFAULT_CLIENT]: " "Nama client pertama [$DEFAULT_CLIENT]: ")" input_client
     FIRST_CLIENT="${input_client:-$DEFAULT_CLIENT}"
     validate_client_name "$FIRST_CLIENT"
 
-    # Opsi Protokol Tambahan — SSH default YA, OpenVPN sebagai alternatif
+    # Extra protocol options — SSH default YES, OpenVPN as alternative
     echo ""
-    echo "Pilih layanan login tunnel:"
-    echo "  1) SSH VPN (Dropbear + Stunnel + WebSocket) — DEFAULT, ringan & universal"
-    echo "  2) OpenVPN (port 1194/UDP + profil .ovpn)"
-    echo "  3) Keduanya"
-    echo "  4) Tidak pasang keduanya"
-    read -rp "Pilih layanan login [1-4] (default 1): " login_choice
+    echo "$(T "Choose the login tunnel service:" "Pilih layanan login tunnel:")"
+    echo "  1) SSH VPN (Dropbear + Stunnel + WebSocket) — $(T "DEFAULT, lightweight & universal" "DEFAULT, ringan & universal")"
+    echo "  2) OpenVPN ($(T "port" "port") 1194/UDP + .ovpn $(T "profile" "profil"))"
+    echo "  3) $(T "Both" "Keduanya")"
+    echo "  4) $(T "Install neither" "Tidak pasang keduanya")"
+    read -rp "$(T "Choose login service [1-4] (default 1): " "Pilih layanan login [1-4] (default 1): ")" login_choice
     case "${login_choice:-1}" in
       1) WITH_SSH=1; WITH_OPENVPN=0 ;;
       2) WITH_SSH=0; WITH_OPENVPN=1 ;;
@@ -212,13 +241,13 @@ main() {
       *) WITH_SSH=1; WITH_OPENVPN=0 ;;
     esac
 
-    # Opsi Engine Tunnel — Xray default, V2Ray alternatif
+    # Tunnel engine options — Xray default, V2Ray alternative
     echo ""
-    echo "Pilih engine tunnel (VMess/VLESS/Trojan + XTLS/REALITY):"
-    echo "  1) Xray-core v26.3.27 — DEFAULT, XTLS-Vision + REALITY tercepat"
-    echo "  2) v2ray-core v5.53.0 — alternatif stabil"
-    echo "  3) Tidak pasang keduanya"
-    read -rp "Pilih engine tunnel [1-3] (default 1): " engine_choice
+    echo "$(T "Choose the tunnel engine (VMess/VLESS/Trojan + XTLS/REALITY):" "Pilih engine tunnel (VMess/VLESS/Trojan + XTLS/REALITY):")"
+    echo "  1) Xray-core v26.3.27 — $(T "DEFAULT, fastest XTLS-Vision + REALITY" "DEFAULT, XTLS-Vision + REALITY tercepat")"
+    echo "  2) v2ray-core v5.53.0 — $(T "stable alternative" "alternatif stabil")"
+    echo "  3) $(T "Install neither" "Tidak pasang keduanya")"
+    read -rp "$(T "Choose tunnel engine [1-3] (default 1): " "Pilih engine tunnel [1-3] (default 1): ")" engine_choice
     case "${engine_choice:-1}" in
       1) WITH_XRAY=1; XRAY_ENGINE="xray" ;;
       2) WITH_XRAY=1; XRAY_ENGINE="v2ray" ;;
@@ -226,17 +255,17 @@ main() {
       *) WITH_XRAY=1; XRAY_ENGINE="xray" ;;
     esac
 
-    read -rp "Ingin sekalian memasang Shadowsocks? [y/N]: " ask_ss
+    read -rp "$(T "Also install Shadowsocks? [y/N]: " "Ingin sekalian memasang Shadowsocks? [y/N]: ")" ask_ss
     [[ "$ask_ss" =~ ^[Yy]$ ]] && WITH_SHADOWSOCKS=1 || true
   fi
 
-  # Validasi global (berlaku untuk mode interaktif & non-interaktif)
-  [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] && [[ "$SERVER_PORT" -ge 1 && "$SERVER_PORT" -le 65535 ]] || die "Port '$SERVER_PORT' tidak valid. Gunakan angka 1-65535."
+  # Global validation (applies to interactive & non-interactive modes)
+  [[ "$SERVER_PORT" =~ ^[0-9]+$ ]] && [[ "$SERVER_PORT" -ge 1 && "$SERVER_PORT" -le 65535 ]] || die "$(T "Port '$SERVER_PORT' is invalid. Use a number 1-65535." "Port '$SERVER_PORT' tidak valid. Gunakan angka 1-65535.")"
   validate_client_name "$FIRST_CLIENT"
   if is_port_in_use "$SERVER_PORT" "udp"; then
-    log_warn "Port UDP $SERVER_PORT sepertinya sudah dipakai oleh aplikasi lain."
+    log_warn "$(T "UDP port $SERVER_PORT seems to be already used by another application." "Port UDP $SERVER_PORT sepertinya sudah dipakai oleh aplikasi lain.")"
     if [[ "$CLI_YES" -eq 0 ]]; then
-      confirm "Tetap lanjutkan dengan port $SERVER_PORT? [y/N] " || die "Instalasi dibatalkan. Jalankan ulang dengan port lain (mis. --port 51821)."
+      confirm "$(T "Continue with port $SERVER_PORT anyway? [y/N] " "Tetap lanjutkan dengan port $SERVER_PORT? [y/N] ")" || die "$(T "Installation cancelled. Re-run with another port (e.g. --port 51821)." "Instalasi dibatalkan. Jalankan ulang dengan port lain (mis. --port 51821).")"
     fi
   fi
 
@@ -245,87 +274,87 @@ main() {
   WG_CONF="/etc/wireguard/wg0.conf"
   CLIENT_DIR="/etc/wireguard/clients"
 
-  # 6. Pasang Paket Dependensi
+  # 7. Install dependency packages
   install_wireguard_packages
 
-  # 7. Aktifkan IP Forwarding
+  # 8. Enable IP forwarding
   enable_ip_forwarding
 
-  # 8. Buka Port Firewall
+  # 9. Open firewall port
   open_firewall_port "$SERVER_PORT" "udp"
 
-  # 9. Buat Kunci Server WireGuard
+  # 10. Generate WireGuard server keys
   wg_generate_server_keys
 
-  # 10. Tulis Konfigurasi Server wg0.conf
+  # 11. Write server wg0.conf
   wg_write_server_conf "$SERVER_PORT" "$NET_IFACE" "10.66.66.1/24" "fd42:42:42::1/64"
 
-  # 11. Simpan File Parameter Server (/etc/wireguard/params)
+  # 12. Save server parameter file (/etc/wireguard/params)
   save_params
 
-  # 12. Buat Client Pertama
-  log_step "Membuat profil untuk client '$FIRST_CLIENT'..."
+  # 13. Create first client
+  log_step "$(T "Creating profile for client '$FIRST_CLIENT'..." "Membuat profil untuk client '$FIRST_CLIENT'...")"
   wg_create_client "$FIRST_CLIENT"
 
-  # 13. Aktifkan dan Jalankan Layanan WireGuard
+  # 14. Enable and start WireGuard service
   wg_enable_and_start
 
-  # 14. Pasang Protokol Tambahan sesuai pilihan (default: SSH + Xray)
+  # 15. Install extra protocols as chosen (default: SSH + Xray)
   if [[ "$WITH_SSH" -eq 1 ]]; then
-    log_step "Memasang SSH VPN Server (default)..."
+    log_step "$(T "Installing SSH VPN server (default)..." "Memasang SSH VPN Server (default)...")"
     ssh_setup_server "$SERVER_PUB_IP" 22 143 444 80
   fi
 
   if [[ "$WITH_OPENVPN" -eq 1 ]]; then
-    log_step "Memasang OpenVPN Server..."
+    log_step "$(T "Installing OpenVPN server..." "Memasang OpenVPN Server...")"
     install_openvpn_packages
     ovpn_setup_server 1194 udp "$NET_IFACE" "$SERVER_PUB_IP"
     ovpn_create_client "${FIRST_CLIENT}-ovpn" || true
   fi
 
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    log_step "Memasang ${XRAY_ENGINE} Server (VMess/VLESS/Trojan + XTLS/REALITY)..."
+    log_step "$(T "Installing ${XRAY_ENGINE} server (VMess/VLESS/Trojan + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} Server (VMess/VLESS/Trojan + XTLS/REALITY)...")"
     xray_setup_server "$SERVER_PUB_IP"
   fi
 
   if [[ "$WITH_SHADOWSOCKS" -eq 1 ]]; then
-    log_step "Memasang Shadowsocks Server..."
+    log_step "$(T "Installing Shadowsocks server..." "Memasang Shadowsocks Server...")"
     ss_setup_server 8388 "$(gen_password 18)" "$SS_METHOD_DEFAULT" "$SERVER_PUB_IP"
   fi
 
-  # 14b. Daftarkan limit default client pertama + pasang monitor (wrwb Store)
+  # 15b. Register default limit for the first client + install monitor (wrwb Store)
   limits_set "$FIRST_CLIENT" "2" "100"
-  log_info "Limit default '$FIRST_CLIENT': 2 IP concurrent, 100 GB/bulan."
+  log_info "$(T "Default limit for '$FIRST_CLIENT': 2 concurrent IPs, 100 GB/month." "Limit default '$FIRST_CLIENT': 2 IP concurrent, 100 GB/bulan.")"
   limits_install_monitor_service
 
-  # 15. Tampilkan QR Code & Petunjuk Akhir
+  # 16. Show QR code & final instructions
   echo ""
-  log_success "Instalasi VPN WireGuard SELESAI!"
+  log_success "$(T "WireGuard VPN installation COMPLETE!" "Instalasi VPN WireGuard SELESAI!")"
   echo ""
-  echo "==================== INFORMASI INSTALASI ===================="
-  echo " Server IP Publik : $SERVER_PUB_IP"
-  echo " WireGuard Port   : $SERVER_PORT (UDP)"
-  echo " Subnet VPN       : $SERVER_SUBNET"
-  echo " DNS Server       : $SERVER_DNS"
-  echo " Client Pertama   : $FIRST_CLIENT"
-  echo " File Konfigurasi : $LAST_CLIENT_CONF"
-  echo " Gambar QR Code   : $LAST_CLIENT_PNG"
+  echo "==================== $(T "INSTALLATION INFO" "INFORMASI INSTALASI") ===================="
+  echo " $(T "Server public IP : $SERVER_PUB_IP" "Server IP Publik : $SERVER_PUB_IP")"
+  echo " $(T "WireGuard port   : $SERVER_PORT (UDP)" "WireGuard Port   : $SERVER_PORT (UDP)")"
+  echo " $(T "VPN subnet       : $SERVER_SUBNET" "Subnet VPN       : $SERVER_SUBNET")"
+  echo " $(T "DNS servers      : $SERVER_DNS" "DNS Server       : $SERVER_DNS")"
+  echo " $(T "First client     : $FIRST_CLIENT" "Client Pertama   : $FIRST_CLIENT")"
+  echo " $(T "Config file      : $LAST_CLIENT_CONF" "File Konfigurasi : $LAST_CLIENT_CONF")"
+  echo " $(T "QR code image    : $LAST_CLIENT_PNG" "Gambar QR Code   : $LAST_CLIENT_PNG")"
   echo "============================================================="
 
-  # Tampilkan QR Code ANSI
+  # Show ANSI QR code
   wg_show_client_qr "$LAST_CLIENT_CONF"
 
-  echo "Perintah Cepat:"
-  echo "  - Tambah user baru : sudo ./add-client.sh <nama_client>"
-  echo "  - Hapus user       : sudo ./remove-client.sh <nama_client>"
-  echo "  - Daftar client    : sudo ./list-clients.sh"
-  echo "  - Cek status       : sudo ./status.sh"
-  echo "  - Menu interaktif  : sudo ./menu.sh"
+  echo "$(T "Quick commands:" "Perintah Cepat:")"
+  echo "  - $(T "Add new user    : sudo ./add-client.sh <client_name>" "Tambah user baru : sudo ./add-client.sh <nama_client>")"
+  echo "  - $(T "Remove user     : sudo ./remove-client.sh <client_name>" "Hapus user       : sudo ./remove-client.sh <nama_client>")"
+  echo "  - $(T "List clients    : sudo ./list-clients.sh" "Daftar client    : sudo ./list-clients.sh")"
+  echo "  - $(T "Check status    : sudo ./status.sh" "Cek status       : sudo ./status.sh")"
+  echo "  - $(T "Interactive menu: sudo ./menu.sh" "Menu interaktif  : sudo ./menu.sh")"
   if [[ "$WITH_SSH" -eq 1 ]]; then
-    echo "  - Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>"
+    echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    echo "  - User Xray/V2Ray  : sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>"
+    echo "  - $(T "Xray/V2Ray users: sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray  : sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>")"
   fi
   echo ""
 }

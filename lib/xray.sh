@@ -1,22 +1,23 @@
 #!/bin/bash
 #
-# lib/xray.sh — Modul Xray-core / V2Ray (VMess, VLESS, Trojan + XTLS/REALITY)
+# lib/xray.sh — Xray-core / V2Ray module (VMess, VLESS, Trojan + XTLS/REALITY, bilingual EN/ID)
+# Branding: wrwb Store
 #
-# Engine default: Xray-core v26.3.27 (stabil, mendukung XTLS-Vision + REALITY).
-# Alternatif: v2ray-core v5.53.0 (dipilih via XRAY_ENGINE=v2ray).
+# Default engine: Xray-core v26.3.27 (stable, supports XTLS-Vision + REALITY).
+# Alternative: v2ray-core v5.53.0 (selected via XRAY_ENGINE=v2ray).
 #
-# Inbound yang dipasang sekaligus (port default):
+# Inbounds installed together (default ports):
 #   VMess WS            10001/tcp  (path /vmess)
 #   VLESS WS            10002/tcp  (path /vless)
-#   Trojan WS           10003/tcp  (path /trojan, password = UUID user)
+#   Trojan WS           10003/tcp  (path /trojan, password = user UUID)
 #   VLESS TCP XTLS      10004/tcp  (flow xtls-rprx-vision)
 #   VLESS TCP REALITY   443/tcp    (flow xtls-rprx-vision, SNI microsoft.com)
 #
-# Setiap user mendapat 1 UUID yang berlaku untuk SEMUA protokol di atas.
+# Each user gets 1 UUID valid for ALL protocols above.
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -53,13 +54,13 @@ xray_detect_arch() {
     x86_64|amd64) echo "64" ;;
     aarch64|arm64) echo "arm64-v8a" ;;
     armv7l|armhf) echo "arm32-v7a" ;;
-    *) die "Arsitektur CPU '$arch' belum didukung otomatis untuk Xray/V2Ray." ;;
+    *) die "$(T "CPU architecture '$arch' is not supported automatically for Xray/V2Ray." "Arsitektur CPU '$arch' belum didukung otomatis untuk Xray/V2Ray.")" ;;
   esac
 }
 
 install_xray_binary() {
   local engine="${XRAY_ENGINE:-$XRAY_ENGINE_DEFAULT}"
-  log_step "Mengunduh dan menyiapkan binary ${engine}..."
+  log_step "$(T "Downloading and preparing the ${engine} binary..." "Mengunduh dan menyiapkan binary ${engine}...")"
 
   mkdir -p "$XRAY_DIR" /usr/local/bin /usr/local/share/xray
   chmod 700 "$XRAY_DIR"
@@ -81,7 +82,7 @@ install_xray_binary() {
 
   local tmp_zip
   tmp_zip="$(mktemp --suffix=.zip)"
-  log_info "Mengunduh ${engine} ${ver} (${zip_name}) dari GitHub..."
+  log_info "$(T "Downloading ${engine} ${ver} (${zip_name}) from GitHub..." "Mengunduh ${engine} ${ver} (${zip_name}) dari GitHub...")"
 
   if curl -fsSL "$url" -o "$tmp_zip"; then
     local tmp_dir
@@ -92,10 +93,10 @@ install_xray_binary() {
       python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$tmp_zip" "$tmp_dir"
     else
       rm -rf "$tmp_dir" "$tmp_zip"
-      die "Butuh 'unzip' atau 'python3' untuk mengekstrak ${engine}."
+      die "$(T "'unzip' or 'python3' is required to extract ${engine}." "Butuh 'unzip' atau 'python3' untuk mengekstrak ${engine}.")"
     fi
 
-    # Nama binary di dalam zip: "xray" (Xray) atau "v2ray" (V2Ray)
+    # Binary name inside the zip: "xray" (Xray) or "v2ray" (V2Ray)
     local src_bin=""
     for b in "$tmp_dir/xray" "$tmp_dir/v2ray"; do
       if [[ -f "$b" ]]; then
@@ -103,21 +104,21 @@ install_xray_binary() {
         break
       fi
     done
-    [[ -n "$src_bin" ]] || { rm -rf "$tmp_dir" "$tmp_zip"; die "Binary ${engine} tidak ditemukan di dalam arsip unduhan."; }
+    [[ -n "$src_bin" ]] || { rm -rf "$tmp_dir" "$tmp_zip"; die "$(T "${engine} binary was not found inside the downloaded archive." "Binary ${engine} tidak ditemukan di dalam arsip unduhan.")"; }
 
     cp -f "$src_bin" "$XRAY_BIN"
     chmod 755 "$XRAY_BIN"
 
-    # Sertakan geoip/geosite bila tersedia di arsip
+    # Include geoip/geosite when bundled in the archive
     for dat in geoip.dat geosite.dat; do
       [[ -f "$tmp_dir/$dat" ]] && cp -f "$tmp_dir/$dat" "/usr/local/share/xray/$dat"
     done
 
     rm -rf "$tmp_dir" "$tmp_zip"
-    log_success "Binary ${engine} ${ver} terpasang di $XRAY_BIN ($("$XRAY_BIN" version 2>/dev/null | head -n1 || echo "$engine"))."
+    log_success "$(T "${engine} ${ver} installed at $XRAY_BIN ($("$XRAY_BIN" version 2>/dev/null | head -n1 || echo "$engine"))." "Binary ${engine} ${ver} terpasang di $XRAY_BIN ($("$XRAY_BIN" version 2>/dev/null | head -n1 || echo "$engine")).")"
   else
     rm -f "$tmp_zip"
-    die "Gagal mengunduh ${engine} ${ver} dari GitHub. Periksa koneksi internet."
+    die "$(T "Failed to download ${engine} ${ver} from GitHub. Check the internet connection." "Gagal mengunduh ${engine} ${ver} dari GitHub. Periksa koneksi internet.")"
   fi
 
   XRAY_ENGINE="$engine"
@@ -148,9 +149,9 @@ xray_setup_server() {
 
   install_xray_binary
 
-  log_step "Membuat konfigurasi ${XRAY_ENGINE} (VMess/VLESS/Trojan + XTLS/REALITY)..."
+  log_step "$(T "Creating the ${XRAY_ENGINE} config (VMess/VLESS/Trojan + XTLS/REALITY)..." "Membuat konfigurasi ${XRAY_ENGINE} (VMess/VLESS/Trojan + XTLS/REALITY)...")"
 
-  # UUID server (akun pertama / default) + kredensial REALITY
+  # Server UUID (first / default account) + REALITY credentials
   local server_uuid short_id reality_out priv_key pub_key
   server_uuid="$(xray_gen_uuid)"
   short_id="$(openssl rand -hex 8 2>/dev/null || head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
@@ -159,13 +160,13 @@ xray_setup_server() {
   priv_key="$(echo "$reality_out" | awk '/PrivateKey|Private key/ {print $NF}')"
   pub_key="$(echo "$reality_out" | awk '/PublicKey|Public key|Password/ {print $NF}')"
   if [[ -z "$priv_key" || -z "$pub_key" ]]; then
-    # Fallback: generate x25519 via openssl (format base64-url aman untuk REALITY)
+    # Fallback: generate x25519 via openssl (base64-url format, safe for REALITY)
     priv_key="$(openssl rand -base64 32 | tr '/+' '_-' | tr -d '=')"
     pub_key="$priv_key"
-    log_warn "x25519 via binary gagal — memakai kunci darurat. Jalankan ulang bila REALITY bermasalah."
+    log_warn "$(T "x25519 via binary failed — using an emergency key. Re-run if REALITY has trouble." "x25519 via binary gagal — memakai kunci darurat. Jalankan ulang bila REALITY bermasalah.")"
   fi
 
-  # Simpan kredensial inti (dibaca add/remove user)
+  # Store core credentials (read by add/remove user)
   cat > "$XRAY_PARAMS" <<EOF
 XRAY_ENGINE="$XRAY_ENGINE"
 XRAY_PUB_IP="$pub_ip"
@@ -239,7 +240,7 @@ EOF
 EOF
   chmod 600 "$XRAY_CONFIG"
 
-  # Validasi konfigurasi sebelum dijalankan
+  # Validate the config before starting
   "$XRAY_BIN" run -test -config "$XRAY_CONFIG" 2>&1 | tail -n5 || true
 
   # Systemd service
@@ -265,31 +266,31 @@ EOF
   systemctl restart xray
 
   if ! systemctl is-active --quiet xray; then
-    log_error "Service xray gagal berjalan. Log:"
+    log_error "$(T "The xray service failed to start. Log:" "Service xray gagal berjalan. Log:")"
     journalctl -u xray -n 20 --no-pager || true
-    die "Instalasi ${XRAY_ENGINE} gagal dijalankan."
+    die "$(T "${XRAY_ENGINE} install failed to start." "Instalasi ${XRAY_ENGINE} gagal dijalankan.")"
   fi
 
-  # Buka semua port inbound di firewall
+  # Open every inbound port in the firewall
   for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY"; do
     open_firewall_port "$p" "tcp"
   done
 
-  # Daftarkan akun server default
+  # Register the default server account
   touch "$XRAY_ACCOUNTS_DB"
   chmod 600 "$XRAY_ACCOUNTS_DB"
   echo "server-default:${server_uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
-  log_success "${XRAY_ENGINE} aktif (VMess/VLESS/Trojan + XTLS-Vision + REALITY)."
+  log_success "$(T "${XRAY_ENGINE} is active (VMess/VLESS/Trojan + XTLS-Vision + REALITY)." "${XRAY_ENGINE} aktif (VMess/VLESS/Trojan + XTLS-Vision + REALITY).")"
 
   xray_print_links "server-default" "$server_uuid"
 }
 
 # ------------------------------------------------------- link generator
-# Mencetak link vmess://, vless://, dan trojan:// + QR untuk 1 UUID
+# Prints vmess://, vless:// and trojan:// links + QR for 1 UUID
 xray_print_links() {
-  local name="${1:?nama user wajib diisi}"
-  local uuid="${2:?uuid wajib diisi}"
+  local name="${1:?$(T "username is required" "nama user wajib diisi")}"
+  local uuid="${2:?$(T "uuid is required" "uuid wajib diisi")}"
   # shellcheck disable=SC1090
   [[ -f "$XRAY_PARAMS" ]] && source "$XRAY_PARAMS"
 
@@ -309,15 +310,15 @@ xray_print_links() {
   # Trojan WS (password = UUID)
   local trojan_link="trojan://${uuid}@${ip}:${XPORT_TROJAN_WS}?security=none&type=ws&path=%2Ftrojan#${name}-trojan-ws"
 
-  # VLESS TCP XTLS-Vision (tanpa TLS, untuk balik Nginx/CDN TLS di depannya bila perlu)
+  # VLESS TCP XTLS-Vision (no TLS, for fronting with your own Nginx/CDN TLS when needed)
   local vless_xtls_link="vless://${uuid}@${ip}:${XPORT_VLESS_XTLS}?encryption=none&flow=xtls-rprx-vision&security=none&type=tcp#${name}-vless-xtls"
 
-  # VLESS TCP REALITY + XTLS-Vision (utama: anti-blokir & efisien)
+  # VLESS TCP REALITY + XTLS-Vision (primary: anti-blocking & efficient)
   local vless_reality_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}&type=tcp#${name}-vless-reality"
 
   echo ""
-  echo "==================== LINK KONEKSI: $name ===================="
-  echo "--- [1] VLESS + TCP + XTLS-Vision + REALITY (UTAMA, paling efisien & anti-blokir)"
+  echo "==================== $(T "CONNECTION LINKS" "LINK KONEKSI"): $name ===================="
+  echo "--- [1] VLESS + TCP + XTLS-Vision + REALITY ($(T "PRIMARY, most efficient & anti-blocking" "UTAMA, paling efisien & anti-blokir"))"
   echo "$vless_reality_link"
   echo ""
   echo "--- [2] VLESS + TCP + XTLS-Vision"
@@ -335,7 +336,7 @@ xray_print_links() {
 
   if command -v qrencode &>/dev/null; then
     echo ""
-    echo "QR Code (VLESS REALITY — pindai dengan v2rayNG / Streisand / FoXray):"
+    echo "$(T "QR code (VLESS REALITY — scan with v2rayNG / Streisand / FoXray):" "QR Code (VLESS REALITY — pindai dengan v2rayNG / Streisand / FoXray):")"
     qrencode -t ansiutf8 "$vless_reality_link" || true
   fi
 
@@ -344,7 +345,7 @@ xray_print_links() {
   export XRAY_LAST_VMESS XRAY_LAST_REALITY
 }
 
-# ------------------------------------------------------- manajemen user
+# ------------------------------------------------------- user management
 xray_user_exists() {
   local name="$1"
   [[ -f "$XRAY_CONFIG" ]] && grep -q "\"ps\": *\"${name}-" "$XRAY_CONFIG" 2>/dev/null && return 0
@@ -357,20 +358,20 @@ xray_user_exists() {
 xray_create_user() {
   local name="$1"
   validate_client_name "$name"
-  [[ -f "$XRAY_PARAMS" ]] || die "Xray/V2Ray belum terpasang. Jalankan instalasi server dulu."
+  [[ -f "$XRAY_PARAMS" ]] || die "$(T "Xray/V2Ray is not installed yet. Install the server first." "Xray/V2Ray belum terpasang. Jalankan instalasi server dulu.")"
   # shellcheck disable=SC1090
   source "$XRAY_PARAMS"
 
   if xray_user_exists "$name"; then
-    die "User Xray '$name' sudah terdaftar! Pilih nama lain."
+    die "$(T "Xray user '$name' is already registered! Pick another name." "User Xray '$name' sudah terdaftar! Pilih nama lain.")"
   fi
 
   local uuid
   uuid="$(xray_gen_uuid)"
 
-  # Sisipkan client baru ke tiap inbound yang punya daftar clients/passwords.
-  # Format config ditulis skrip ini sehingga pola JSON-nya dapat diprediksi:
-  #   VMess/VLESS : { "id": "<uuid>" ... }  (VLESS+XTLS/REALITY memakai flow)
+  # Insert the new client into every inbound that owns a clients/passwords list.
+  # The config is written by this script so its JSON shape is predictable:
+  #   VMess/VLESS : { "id": "<uuid>" ... }  (VLESS+XTLS/REALITY use flow)
   #   Trojan      : { "password": "<uuid>" }
   local tmp
   tmp="$(mktemp)"
@@ -408,30 +409,30 @@ PYEOF
   rm -f "$tmp"
   chmod 600 "$XRAY_CONFIG"
 
-  # Validasi & reload service
-  "$XRAY_BIN" run -test -config "$XRAY_CONFIG" || die "Konfigurasi Xray baru tidak valid, dibatalkan."
+  # Validate & reload the service
+  "$XRAY_BIN" run -test -config "$XRAY_CONFIG" || die "$(T "The new Xray config is invalid, aborting." "Konfigurasi Xray baru tidak valid, dibatalkan.")"
   systemctl restart xray
-  systemctl is-active --quiet xray || die "Service xray gagal restart setelah tambah user."
+  systemctl is-active --quiet xray || die "$(T "The xray service failed to restart after adding the user." "Service xray gagal restart setelah tambah user.")"
 
   echo "${name}:${uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
-  log_success "User Xray '$name' dibuat (UUID: $uuid)."
+  log_success "$(T "Xray user '$name' created (UUID: $uuid)." "User Xray '$name' dibuat (UUID: $uuid).")"
   xray_print_links "$name" "$uuid"
 }
 
 xray_remove_user() {
   local name="$1"
   validate_client_name "$name"
-  [[ -f "$XRAY_PARAMS" ]] || die "Xray/V2Ray belum terpasang."
+  [[ -f "$XRAY_PARAMS" ]] || die "$(T "Xray/V2Ray is not installed." "Xray/V2Ray belum terpasang.")"
   # shellcheck disable=SC1090
   source "$XRAY_PARAMS"
 
-  # Ambil UUID user dari database
+  # Look up the user UUID from the database
   local uuid=""
   if [[ -f "$XRAY_ACCOUNTS_DB" ]]; then
     uuid="$(awk -F: -v u="$name" '$1==u {print $2}' "$XRAY_ACCOUNTS_DB" | head -n1)"
   fi
-  [[ -n "$uuid" ]] || die "User Xray '$name' tidak ditemukan."
+  [[ -n "$uuid" ]] || die "$(T "Xray user '$name' was not found." "User Xray '$name' tidak ditemukan.")"
 
   local tmp
   tmp="$(mktemp)"
@@ -459,14 +460,14 @@ PYEOF
   sed -i "/^${name}:/d" "$XRAY_ACCOUNTS_DB"
   systemctl restart xray || true
 
-  log_success "User Xray '$name' berhasil dihapus dari semua inbound."
+  log_success "$(T "Xray user '$name' removed from all inbounds." "User Xray '$name' berhasil dihapus dari semua inbound.")"
 }
 
 xray_list_users() {
   echo "======================================================================"
-  echo -e "${_C_BOLD}DAFTAR USER XRAY/V2RAY${_C_RESET}"
+  echo -e "${_C_BOLD}$(T "XRAY/V2RAY USER LIST" "DAFTAR USER XRAY/V2RAY")${_C_RESET}"
   echo "======================================================================"
-  printf "%-18s %-40s %-12s\n" "USERNAME" "UUID" "DIBUAT"
+  printf "%-18s %-40s %-12s\n" "USERNAME" "UUID" "$(T "CREATED" "DIBUAT")"
   echo "----------------------------------------------------------------------"
 
   local count=0
@@ -479,10 +480,10 @@ xray_list_users() {
   fi
 
   if [[ "$count" -eq 0 ]]; then
-    echo " (Belum ada user yang terdaftar)"
+    echo " ($(T "No users registered yet" "Belum ada user yang terdaftar"))"
   fi
   echo "----------------------------------------------------------------------"
-  echo "Total user: $count"
+  echo "$(T "Total users: $count" "Total user: $count")"
   echo "Engine: ${XRAY_ENGINE:-xray} | Config: $XRAY_CONFIG"
   echo "======================================================================"
 }

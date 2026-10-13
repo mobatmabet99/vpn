@@ -2,6 +2,12 @@
 
 > Dibuat oleh **wrwb Store** — Limit default 2 IP & 100 GB, auto-suspend 5 menit jika multi-login.
 
+> 📖 English version (default): [README.en.md](README.en.md)
+>
+> **Baru di v1.3:** installer bilingual **English (default) / Indonesia**.
+> Saat instalasi Anda ditanya bahasa — tekan Enter saja = otomatis **English**.
+> Detail: [CHANGELOG-v1.3.md](CHANGELOG-v1.3.md).
+
 Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai mesin utama, dengan **SSH VPN** dan **Xray-core** terpasang **secara default**, plus opsi **OpenVPN**, **v2ray-core**, dan **Shadowsocks**. Dibuat modular, aman, dan kompatibel dengan banyak distro Linux — dari versi lama sampai terbaru.
 
 > Dibuat untuk Linux Server (VPS / Bare Metal). Bukan untuk dijalankan di Windows — clone repo ini ke server Linux Anda.
@@ -9,6 +15,21 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 > **Baru di v1.2:** setiap akun baru menanyakan **Limit IP** dan **Limit Bandwidth**
 > (default **2 IP** & **100 GB/bulan** bila di-skip). Multi-login melebihi limit =
 > **auto-suspend 5 menit + auto-clear sesi**. Detail: [CHANGELOG-v1.2.md](CHANGELOG-v1.2.md).
+
+---
+
+## 🌐 Bahasa / Language
+
+- Bahasa default: **English**. Saat instalasi, tekan **Enter** saja = English.
+- Pilih **2) Indonesia** untuk installer Bahasa Indonesia.
+- Non-interaktif / automation:
+  ```bash
+  sudo ./install.sh --yes                 # English (default)
+  sudo ./install.sh --lang id --yes       # Bahasa Indonesia
+  VPN_LANG=id sudo ./install.sh --yes     # via env var
+  ```
+- Pilihan tersimpan di `/etc/vpn/lang` dan dipakai semua skrip (`add-client.sh`, `menu.sh`, `status.sh`, ...).
+- Ganti kapan saja: `sudo ./menu.sh` → menu **17) Ganti bahasa**, atau `sudo ./menu.sh --lang en|id`.
 
 ---
 
@@ -26,7 +47,8 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
-| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-16), `uninstall.sh`, plus library di `lib/` (termasuk `lib/limits.sh`) |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-17), `uninstall.sh`, plus library di `lib/` (termasuk `lib/lang.sh`, `lib/limits.sh`) |
+| 🌐 **Bilingual (v1.3)** | English default, Indonesia opsional. Satu codebase via `T "English" "Indonesia"` di `lib/lang.sh`, tersimpan di `/etc/vpn/lang` |
 | ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client/user, backup konfigurasi lama |
 | ⏱️ **Limit & suspend (v1.2)** | Limit IP concurrent + bandwidth GB/bulan per akun (default 2 IP & 100 GB). Multi-login > limit = auto-suspend 5 menit + auto-clear sesi. Monitor systemd `vpn-limits` tiap 60 detik |
 
@@ -46,11 +68,15 @@ vpn/
 ├── add-xray-user.sh        # Buat user Xray/V2Ray + limit IP & bandwidth
 ├── remove-xray-user.sh     # Hapus user Xray/V2Ray (+ bersihkan data limit)
 ├── check-limits.sh         # Lihat limit IP, kuota, IP aktif & status suspend
-├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall, limit
-├── menu.sh                 # Menu interaktif 0-16 (panel kontrol wrwb Store)
-├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit)
+├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall, limit, bahasa
+├── menu.sh                 # Menu interaktif 0-17 (panel kontrol wrwb Store, termasuk ganti bahasa)
+├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit, + /etc/vpn/lang)
+├── README.md               # Dokumentasi Indonesia (file ini)
+├── README.en.md            # Dokumentasi English (default)
 ├── CHANGELOG-v1.2.md       # Catatan rilis v1.2 (limit IP & bandwidth)
+├── CHANGELOG-v1.3.md       # Catatan rilis v1.3 (bilingual EN/ID)
 ├── lib/
+│   ├── lang.sh             # Inti bilingual v1.3: T "EN" "ID", /etc/vpn/lang
 │   ├── common.sh           # Logging, deteksi OS, validasi, helper jaringan, params
 │   ├── system.sh           # Instal paket, IP forwarding, firewall (UFW/firewalld)
 │   ├── wireguard.sh        # Inti WireGuard: server conf, alokasi IP, CRUD client
@@ -80,6 +106,7 @@ File konfigurasi yang dihasilkan di server:
 ```
 /etc/xray/params                   # UUID server, kunci REALITY, port inbound
 /etc/xray/accounts.db              # Database user Xray (nama:uuid:dibuat)
+/etc/vpn/lang                      # v1.3 pilihan bahasa ("en" atau "id")
 ```
 
 ---
@@ -107,13 +134,21 @@ chmod +x *.sh
 
 ### 2. Jalankan installer sebagai root
 
-Mode interaktif — Anda memilih layanan login (SSH/OpenVPN, **default: SSH**) dan engine tunnel (Xray/V2Ray, **default: Xray**):
+Mode interaktif — Anda memilih bahasa instalasi (**default: English**, tekan Enter saja),
+layanan login (SSH/OpenVPN, **default: SSH**) dan engine tunnel (Xray/V2Ray, **default: Xray**):
 
 ```bash
 sudo ./install.sh
 ```
 
-Mode non-interaktif — langsung default penuh (**WireGuard + SSH + Xray**, cocok untuk automation):
+```
+Choose installation language / Pilih bahasa instalasi:
+  1) English (default)
+  2) Indonesia
+Select [1-2] / Pilih [1-2] (default 1 - English):
+```
+
+Mode non-interaktif — langsung default penuh (**WireGuard + SSH + Xray**, English, cocok untuk automation):
 
 ```bash
 sudo ./install.sh --yes
@@ -127,6 +162,9 @@ sudo ./install.sh --with-openvpn --with-v2ray --yes
 
 # Default + Shadowsocks sekalian
 sudo ./install.sh --with-shadowsocks --yes
+
+# Installer Bahasa Indonesia, non-interaktif
+sudo ./install.sh --lang id --yes
 
 # Minimalis: hanya WireGuard
 sudo ./install.sh --no-ssh --no-xray --yes
@@ -147,12 +185,14 @@ Lihat semua opsi:
 | `--with-openvpn` | Pasang OpenVPN **pengganti** SSH (saling eksklusif, bisa dikombinasi manual) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pilih engine tunnel (default: Xray). `--with-v2ray` = engine v2ray-core |
 | `--with-shadowsocks` | Tambah Shadowsocks sekalian (default: tidak) |
+| `--lang en\|id` | Bahasa instalasi (default: en). Juga via env `VPN_LANG=en\|id` |
 | `-p/-c/-d/-y` | Port WG, nama client pertama, DNS, mode non-interaktif |
 
 ### 3. Apa yang dilakukan `install.sh` secara berurutan
 
 1. Validasi root & keberadaan `/dev/net/tun`.
-2. Deteksi OS (Ubuntu/Debian/RHEL/...) — distro asing diberi peringatan dan diminta konfirmasi, kecuali dipaksa.
+2. Tanya bahasa instalasi (default English), simpan ke `/etc/vpn/lang`.
+3. Deteksi OS (Ubuntu/Debian/RHEL/...) — distro asing diberi peringatan dan diminta konfirmasi, kecuali dipaksa.
 3. Deteksi interface jaringan utama & IP publik server.
 4. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
 5. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
@@ -169,9 +209,10 @@ Lihat semua opsi:
 
 ```bash
 sudo ./menu.sh
+sudo ./menu.sh --lang id   # paksa Bahasa Indonesia untuk sesi ini
 ```
 
-Menu 0–15: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek status, instal SSH / OpenVPN / Xray / V2Ray / Shadowsocks, kelola akun SSH, kelola user Xray, mulai ulang service, uninstall.
+Menu 0–17: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek status, instal SSH / OpenVPN / Xray / V2Ray / Shadowsocks, kelola akun SSH, kelola user Xray, mulai ulang service, cek limit, ganti bahasa (17), uninstall.
 
 ---
 
@@ -267,12 +308,15 @@ Aturan main:
 ## 📋 Perintah Operasional Lainnya
 
 ```bash
-# Diagnostik server (service, forwarding, TUN, NAT, firewall)
+# Diagnostik server (service, forwarding, TUN, NAT, firewall, bahasa, limit)
 sudo ./status.sh
 
 # Mulai ulang layanan WireGuard manual
 sudo systemctl restart wg-quick@wg0
 sudo wg show   # lihat handshake & transfer per peer
+
+# Ganti bahasa (menu 17)
+sudo ./menu.sh
 
 # Hapus bersih seluruh VPN dari server (dengan backup darurat di /root/)
 sudo ./uninstall.sh
@@ -311,6 +355,7 @@ sudo ./uninstall.sh
 | REALITY tidak connect | Pastikan jam server akurat (NTP), SNI `serverNames` cocok dengan `serverName` client, dan `pbk`/`sid` disalin persis dari link server. |
 | QR tidak tampil di terminal | Terminal tidak dukung ANSI-UTF8 — gunakan file PNG di `/etc/wireguard/clients/<nama>/` atau salin link Xray manual. |
 | OS baru (mis. Ubuntu 26 / Debian 13) diperingatkan "belum teruji" | Lanjut dengan `y`, atau set `FORCE_OS=1`. Laporkan hasilnya via Issues agar daftar resmi diperbarui. |
+| Bahasa salah | Jalankan ulang `sudo ./menu.sh` → 17, atau `VPN_LANG=id sudo ./status.sh`, atau `echo id \| sudo tee /etc/vpn/lang`. |
 
 ---
 
@@ -319,6 +364,7 @@ sudo ./uninstall.sh
 - **Ganti port default:** edit `DEFAULT_PORT` di `install.sh`, atau instal dengan `--port <nomor>`.
 - **Ganti subnet VPN:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` di `install.sh` dan `base_v4`/`base_v6` di `lib/wireguard.sh` (pastikan konsisten di `wg_write_server_conf` dan `wg_get_next_ip`).
 - **Ganti DNS default:** edit `DEFAULT_DNS` di `install.sh`.
+- **Ganti bahasa default:** tidak perlu edit kode — gunakan `--lang en|id`, `VPN_LANG=id`, atau menu 17. File: `/etc/vpn/lang`.
 - **Ganti versi Xray/V2Ray:** edit `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) di `lib/xray.sh` — cek rilis terbaru di [Xray-core releases](https://github.com/XTLS/Xray-core/releases) dan [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
 - **Ganti port inbound Xray:** edit `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY` di `lib/xray.sh` sebelum instalasi.
 - **Ganti SNI REALITY:** edit `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` di `lib/xray.sh` (syarat: domain asing, TLSv1.3 + H2, tidak redirect).
@@ -344,4 +390,4 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 Bebas digunakan untuk keperluan pribadi maupun komersial. Disediakan "sebagaimana adanya" tanpa garansi. Pastikan kepatuhan terhadap hukum/ToS provider jaringan Anda saat menjalankan layanan VPN.
 
 ---
-Dibuat oleh **wrwb Store** — v1.2 (Limit 2 IP & 100 GB, auto-suspend 5 menit).
+Dibuat oleh **wrwb Store** — v1.3 (Bilingual EN/ID, default English + Limit 2 IP & 100 GB, auto-suspend 5 menit).

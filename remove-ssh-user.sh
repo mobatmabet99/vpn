@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
-#  remove-ssh-user.sh — Menghapus Akun SSH VPN
-#  Penggunaan:
+#  remove-ssh-user.sh — Remove an SSH VPN account
+#  Usage:
 #    sudo ./remove-ssh-user.sh [username]
 # ==============================================================================
 
@@ -22,24 +22,24 @@ USERNAME="${1:-}"
 
 if [[ -z "$USERNAME" ]]; then
   echo "================================================================"
-  echo -e "${_C_BOLD}HAPUS AKUN SSH VPN${_C_RESET}"
+  echo -e "${_C_BOLD}$(T "REMOVE SSH VPN ACCOUNT" "HAPUS AKUN SSH VPN")${_C_RESET}"
   echo "================================================================"
   if [[ -s "$SSH_ACCOUNTS_DB" ]]; then
-    echo "Akun terdaftar:"
+    echo "$(T "Registered accounts:" "Akun terdaftar:")"
     cut -d: -f1 "$SSH_ACCOUNTS_DB" | sort | sed 's/^/  - /'
     echo ""
   fi
-  read -rp "Username yang dihapus: " USERNAME
+  read -rp "$(T "Username to remove: " "Username yang dihapus: ")" USERNAME
 fi
 
 if [[ "${AUTO_YES:-0}" != "1" ]]; then
-  read -rp "Yakin hapus akun SSH '$USERNAME'? [y/N]: " confirm_del
-  [[ "$confirm_del" =~ ^[Yy]$ ]] || die "Penghapusan dibatalkan."
+  read -rp "$(T "Really remove SSH account '$USERNAME'? [y/N]: " "Yakin hapus akun SSH '$USERNAME'? [y/N]: ")" confirm_del
+  [[ "$confirm_del" =~ ^[Yy]$ ]] || die "$(T "Removal cancelled." "Penghapusan dibatalkan.")"
 fi
 
 ssh_remove_user "$USERNAME"
 limits_remove "$USERNAME"
 
 echo ""
-log_success "Akun SSH '$USERNAME' berhasil dihapus."
+log_success "$(T "SSH account '$USERNAME' has been removed." "Akun SSH '$USERNAME' berhasil dihapus.")"
 echo ""

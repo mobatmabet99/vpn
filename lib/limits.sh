@@ -1,18 +1,18 @@
 #!/bin/bash
 #
-# lib/limits.sh — Enforcement limit IP & bandwidth (wrwb Store)
+# lib/limits.sh — IP & bandwidth limit enforcement (wrwb Store, bilingual EN/ID)
 #
-# Fitur v1.2:
-#   - Limit concurrent IP per user/client (default: 2 IP)
-#   - Limit bandwidth per user/client (default: 100 GB/bulan)
-#   - Auto-suspend 5 menit bila multi-login terdeteksi (> limit IP)
-#   - Auto-clear sesi setelah suspend agar perhitungan berikutnya fresh
+# v1.2 features:
+#   - Concurrent IP limit per user/client (default: 2 IPs)
+#   - Bandwidth limit per user/client (default: 100 GB/month)
+#   - 5-minute auto-suspend on multi-login detection (> IP limit)
+#   - Auto-clear sessions after suspend so the next count starts fresh
 #   - Database: /var/lib/vpn-limits/*.db
-#   - Kompatibel: Debian 10/11/12/13, Ubuntu 20.04/22.04/24.04/26.04
+#   - Compatible: Debian 10/11/12/13, Ubuntu 20.04/22.04/24.04/26.04
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -92,9 +92,9 @@ limits_show_user() {
   bytes_used="$(usage_get_bytes "$user")"
   gb_used="$(awk -v b="$bytes_used" 'BEGIN { printf "%.2f", b/1073741824 }')"
   ips="$(session_count_ips "$user")"
-  echo "User: $user | Limit IP: $max_ip (aktif: $ips) | Kuota: ${gb_used}/${max_gb} GB"
+  echo "User: $user | $(T "IP limit: $max_ip (active: $ips)" "Limit IP: $max_ip (aktif: $ips)") | $(T "Quota: ${gb_used}/${max_gb} GB" "Kuota: ${gb_used}/${max_gb} GB")"
   if suspend_is_active "$user"; then
-    echo "Status: SUSPENDED (multi-login, tunggu 5 menit)"
+    echo "Status: SUSPENDED ($(T "multi-login, wait 5 minutes" "multi-login, tunggu 5 menit"))"
   fi
 }
 
@@ -279,14 +279,15 @@ limits_collect_sessions() {
     done
   fi
 
-  # 2. SSH tambahan: koneksi TCP ke port 22/143/444 via ss (fallback bila who kosong)
-  #    Petakan PID sshd -> user via ps. Hanya untuk akun di limits.db.
+  # 2. Extra SSH: TCP connections to ports 22/143/444 via ss (fallback when who is empty)
+  #    Map sshd PID -> user via ps. Only for accounts in limits.db.
+  #    Portable awk is used instead of grep -oP (missing on Alpine/minimal RHEL).
   if command -v ss &>/dev/null && command -v ps &>/dev/null; then
     ss -tnp state established 2>/dev/null | grep -E ':22 |:143 |:444 ' | while read -r line; do
       local peer_ip pid user
       peer_ip="$(echo "$line" | awk '{print $5}' | cut -d: -f1)"
       [[ "$peer_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
-      pid="$(echo "$line" | grep -oP 'pid=\K[0-9]+' 2>/dev/null | head -n1 || true)"
+      pid="$(echo "$line" | awk '{for (i=1; i<=NF; i++) if ($i ~ /^pid=/) { split($i, a, "="); sub(/[^0-9].*$/, "", a[2]); print a[2]; exit }}' 2>/dev/null | head -n1 || true)"
       [[ -z "$pid" ]] && continue
       user="$(ps -o user= -p "$pid" 2>/dev/null | tr -d ' ' || true)"
       [[ -z "$user" ]] && continue
@@ -313,14 +314,15 @@ limits_collect_sessions() {
     done
   fi
 
-  # 4. Xray/V2Ray: access log (jika diaktifkan di /var/log/xray/access.log)
-  #    Format bawaan: ... from 1.2.3.4:port ... email: <nama>
+  # 4. Xray/V2Ray: access log (when enabled at /var/log/xray/access.log)
+  #    Default format: ... from 1.2.3.4:port ... email: <name>
+  #    Portable awk/sed instead of grep -oP.
   if [[ -f /var/log/xray/access.log ]]; then
-    # Ambil 500 baris terakhir dalam 10 menit (hindari file raksasa)
+    # Take the last 500 lines within 10 minutes (avoid huge files)
     tail -n 500 /var/log/xray/access.log 2>/dev/null | while read -r line; do
       local ip email
-      ip="$(echo "$line" | grep -oP 'from \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' 2>/dev/null | head -n1 || true)"
-      email="$(echo "$line" | grep -oP 'email: \K[^ ]+' 2>/dev/null | head -n1 || true)"
+      ip="$(echo "$line" | sed -n 's/.*from \([0-9][0-9.]*\)[: ].*/\1/p' 2>/dev/null | head -n1 || true)"
+      email="$(echo "$line" | sed -n 's/.*email: \([^ ]*\).*/\1/p' 2>/dev/null | head -n1 || true)"
       [[ -z "$ip" || -z "$email" ]] && continue
       if grep -q "^${email}:" "$LIMITS_DB" 2>/dev/null; then
         echo "${email}:${ip}:${now}" >> "$SESSION_DB"
@@ -328,7 +330,7 @@ limits_collect_sessions() {
     done
   fi
 
-  # Bersihkan entri kedaluwarsa + deduplikasi (user:ip -> timestamp terbaru)
+  # Clean up expired entries + deduplicate (user:ip -> newest timestamp)
   tmp="$(mktemp)"
   awk -F: -v cut="$cutoff" 'NF==3 && $3 >= cut { key=$1":"$2; if ($3 > seen[key]) seen[key]=$3 } END { for (k in seen) print k":"seen[k] }' "$SESSION_DB" > "$tmp" 2>/dev/null || true
   cat "$tmp" > "$SESSION_DB"
@@ -349,9 +351,9 @@ suspend_add() {
   rm -f "$tmp"
   echo "${user}:${until_epoch}" >> "$SUSPEND_DB"
   if declare -f log_warn &>/dev/null; then
-    log_warn "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login."
+    log_warn "$(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login.")"
   else
-    echo "[WARN] User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login." >&2
+    echo "[WARN] $(T "User '$user' suspended for $((duration / 60)) minutes (multi-login)." "User '$user' di-suspend sementara selama $((duration / 60)) menit karena multi-login.")" >&2
   fi
 }
 
@@ -394,7 +396,7 @@ suspend_remaining() {
 
 suspend_clear_sessions() {
   local user="$1" mode="${2:-}"
-  # Hapus semua sesi user dari database agar perhitungan IP fresh
+  # Remove every session of the user from the database so the next IP count is fresh
   if [[ -f "$SESSION_DB" ]]; then
     local tmp
     tmp="$(mktemp)"
@@ -402,13 +404,13 @@ suspend_clear_sessions() {
     cat "$tmp" > "$SESSION_DB"
     rm -f "$tmp"
   fi
-  # Matikan koneksi aktif user sistem (akun SSH)
+  # Kill the user's active system connections (SSH accounts)
   if id "$user" &>/dev/null; then
     pkill -u "$user" 2>/dev/null || true
   fi
   if [[ "$mode" != "silent" ]]; then
     if declare -f log_info &>/dev/null; then
-      log_info "Semua sesi user '$user' dibersihkan."
+      log_info "$(T "All sessions of user '$user' were cleared." "Semua sesi user '$user' dibersihkan.")"
     fi
   fi
 }
@@ -417,7 +419,7 @@ suspend_clear_sessions() {
 limits_enforce_all() {
   limits_init
   [[ -f "$LIMITS_DB" ]] || return 0
-  # Kumpulkan bandwidth WireGuard + sesi nyata dulu
+  # Collect WireGuard bandwidth + real sessions first
   usage_collect_wireguard || true
   limits_collect_sessions || true
 
@@ -427,20 +429,20 @@ limits_enforce_all() {
     [[ "$max_ip" =~ ^[0-9]+$ ]] || max_ip="$DEFAULT_MAX_IP"
     [[ "$max_gb" =~ ^[0-9]+$ ]] || max_gb="$DEFAULT_MAX_GB"
 
-    # 1. Lewati user yang masih dalam masa suspend
+    # 1. Skip users still inside their suspend window
     if suspend_is_active "$user"; then
       continue
     fi
 
-    # 2. Cek bandwidth limit
+    # 2. Check the bandwidth limit
     if ! usage_check_limit "$user"; then
       if declare -f log_warn &>/dev/null; then
-        log_warn "User '$user' melebihi bandwidth limit ${max_gb} GB/bulan. Nonaktifkan manual bila perlu."
+        log_warn "$(T "User '$user' exceeded the ${max_gb} GB/month bandwidth limit. Disable manually when needed." "User '$user' melebihi bandwidth limit ${max_gb} GB/bulan. Nonaktifkan manual bila perlu.")"
       fi
       continue
     fi
 
-    # 3. Cek IP limit (multi-login)
+    # 3. Check the IP limit (multi-login)
     local current_ips
     current_ips="$(session_count_ips "$user")"
     [[ "$current_ips" =~ ^[0-9]+$ ]] || current_ips="0"
@@ -448,7 +450,7 @@ limits_enforce_all() {
       local ip_list
       ip_list="$(session_list_ips "$user" | tr '\n' ' ')"
       if declare -f log_warn &>/dev/null; then
-        log_warn "User '$user' multi-login: $current_ips IP (limit: $max_ip) [$ip_list]. Auto-suspend 5 menit + clear sesi."
+        log_warn "$(T "User '$user' multi-login: $current_ips IPs (limit: $max_ip) [$ip_list]. Auto-suspend 5 min + clear sessions." "User '$user' multi-login: $current_ips IP (limit: $max_ip) [$ip_list]. Auto-suspend 5 menit + clear sesi.")"
       fi
       suspend_add "$user" "$SUSPEND_SECONDS_DEFAULT"
       suspend_clear_sessions "$user"
@@ -459,7 +461,7 @@ limits_enforce_all() {
 # ------------------------------------------------------- Systemd monitor service
 limits_install_monitor_service() {
   if declare -f log_step &>/dev/null; then
-    log_step "Memasang layanan monitor limit wrwb Store (cek setiap 60 detik)..."
+    log_step "$(T "Installing the wrwb Store limit monitor service (checks every 60 seconds)..." "Memasang layanan monitor limit wrwb Store (cek setiap 60 detik)...")"
   fi
 
   local repo_lib_dir="$SCRIPT_DIR/lib"
@@ -520,7 +522,7 @@ SERVICE_EOF
   systemctl restart vpn-limits.service 2>/dev/null || true
 
   if declare -f log_success &>/dev/null; then
-    log_success "Layanan monitor limit aktif (cek setiap 60 detik) — wrwb Store."
+    log_success "$(T "Limit monitor service is active (checks every 60 seconds) — wrwb Store." "Layanan monitor limit aktif (cek setiap 60 detik) — wrwb Store.")"
   fi
 }
 

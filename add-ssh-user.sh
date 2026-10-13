@@ -1,9 +1,9 @@
 #!/bin/bash
 # ==============================================================================
-#  add-ssh-user.sh — Membuat Akun SSH VPN Baru (dengan masa berlaku, limit IP & bandwidth)
+#  add-ssh-user.sh — Create a new SSH VPN account (expiry, IP & bandwidth limits)
 #  Branding: wrwb Store
-#  Penggunaan:
-#    sudo ./add-ssh-user.sh [username] [password] [masa_hari] [max_ip] [max_gb]
+#  Usage:
+#    sudo ./add-ssh-user.sh [username] [password] [valid_days] [max_ip] [max_gb]
 # ==============================================================================
 
 set -euo pipefail
@@ -26,34 +26,34 @@ MAX_IP="${4:-}"
 MAX_GB="${5:-}"
 
 echo "================================================================"
-echo -e "${_C_BOLD}BUAT AKUN SSH VPN BARU — wrwb Store${_C_RESET}"
+echo -e "${_C_BOLD}$(T "CREATE NEW SSH VPN ACCOUNT — wrwb Store" "BUAT AKUN SSH VPN BARU — wrwb Store")${_C_RESET}"
 echo "================================================================"
 
 if [[ -z "$USERNAME" ]]; then
-  read -rp "Username baru (contoh: andi): " USERNAME
-  read -rp "Password (kosongkan = auto-generate): " PASSWORD
-  read -rp "Masa berlaku hari [30]: " days_input
+  read -rp "$(T "New username (e.g. andi): " "Username baru (contoh: andi): ")" USERNAME
+  read -rp "$(T "Password (empty = auto-generate): " "Password (kosongkan = auto-generate): ")" PASSWORD
+  read -rp "$(T "Validity in days [30]: " "Masa berlaku hari [30]: ")" days_input
   DAYS="${days_input:-30}"
-  
-  read -rp "Limit IP concurrent [Default: 2]: " ip_input
+
+  read -rp "$(T "Concurrent IP limit [Default: 2]: " "Limit IP concurrent [Default: 2]: ")" ip_input
   MAX_IP="${ip_input:-2}"
-  
-  read -rp "Limit Bandwidth GB / bulan [Default: 100]: " gb_input
+
+  read -rp "$(T "Bandwidth limit GB / month [Default: 100]: " "Limit Bandwidth GB / bulan [Default: 100]: ")" gb_input
   MAX_GB="${gb_input:-100}"
 fi
 
 [[ -z "$MAX_IP" ]] && MAX_IP="2"
 [[ -z "$MAX_GB" ]] && MAX_GB="100"
 
-[[ "$DAYS" =~ ^[0-9]+$ ]] || die "Masa berlaku harus berupa angka hari."
-[[ "$MAX_IP" =~ ^[0-9]+$ ]] || die "Limit IP harus berupa angka."
-[[ "$MAX_GB" =~ ^[0-9]+$ ]] || die "Limit bandwidth harus berupa angka."
+[[ "$DAYS" =~ ^[0-9]+$ ]] || die "$(T "Validity must be a number of days." "Masa berlaku harus berupa angka hari.")"
+[[ "$MAX_IP" =~ ^[0-9]+$ ]] || die "$(T "IP limit must be a number." "Limit IP harus berupa angka.")"
+[[ "$MAX_GB" =~ ^[0-9]+$ ]] || die "$(T "Bandwidth limit must be a number." "Limit bandwidth harus berupa angka.")"
 
 ssh_create_user "$USERNAME" "$PASSWORD" "$DAYS"
 limits_set "$USERNAME" "$MAX_IP" "$MAX_GB"
 
-# Ambil info koneksi bila params tersedia
-SSH_HOST="IP-SERVER"
+# Fetch connection info when params are available
+SSH_HOST="SERVER-IP"
 SSH_PORT="22"
 if [[ -f "$SSH_PARAMS" ]]; then
   # shellcheck disable=SC1090
@@ -63,14 +63,14 @@ if [[ -f "$SSH_PARAMS" ]]; then
 fi
 
 echo ""
-echo "==================== DETAIL AKUN SSH (wrwb Store) ===================="
-echo " Host         : $SSH_HOST"
-echo " Port SSH     : $SSH_PORT"
-echo " Username     : $SSH_LAST_USER"
-echo " Password     : $SSH_LAST_PASS"
-echo " Berlaku s/d  : $SSH_LAST_EXPIRE"
-echo " Limit IP     : $MAX_IP concurrent (Auto-suspend 5m jika multi-login)"
-echo " Limit Kuota  : $MAX_GB GB / bulan"
+echo "==================== $(T "SSH ACCOUNT DETAILS (wrwb Store)" "DETAIL AKUN SSH (wrwb Store)") ===================="
+echo " $(T "Host         : $SSH_HOST" "Host         : $SSH_HOST")"
+echo " $(T "SSH port     : $SSH_PORT" "Port SSH     : $SSH_PORT")"
+echo " $(T "Username     : $SSH_LAST_USER" "Username     : $SSH_LAST_USER")"
+echo " $(T "Password     : $SSH_LAST_PASS" "Password     : $SSH_LAST_PASS")"
+echo " $(T "Valid until  : $SSH_LAST_EXPIRE" "Berlaku s/d  : $SSH_LAST_EXPIRE")"
+echo " $(T "IP limit     : $MAX_IP concurrent (auto-suspend 5m on multi-login)" "Limit IP     : $MAX_IP concurrent (Auto-suspend 5m jika multi-login)")"
+echo " $(T "Data quota   : $MAX_GB GB / month" "Limit Kuota  : $MAX_GB GB / bulan")"
 echo "======================================================================"
-echo "Contoh koneksi : ssh -p $SSH_PORT $SSH_LAST_USER@$SSH_HOST"
+echo "$(T "Connection example : ssh -p $SSH_PORT $SSH_LAST_USER@$SSH_HOST" "Contoh koneksi : ssh -p $SSH_PORT $SSH_LAST_USER@$SSH_HOST")"
 echo ""

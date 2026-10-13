@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# lib/openvpn.sh — Modul opsional OpenVPN
-# Menyediakan setup server OpenVPN dan export profil client (.ovpn)
+# lib/openvpn.sh — Optional OpenVPN module (bilingual EN/ID)
+# Provides OpenVPN server setup and client profile (.ovpn) export
+# Branding: wrwb Store
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -15,7 +16,7 @@ OVPN_CLIENTS_DIR="$OVPN_DIR/clients"
 OVPN_PARAMS="/etc/openvpn/params"
 
 install_openvpn_packages() {
-  log_step "Menginstal dependensi OpenVPN & Easy-RSA..."
+  log_step "$(T "Installing OpenVPN & Easy-RSA dependencies..." "Menginstal dependensi OpenVPN & Easy-RSA...")"
   detect_os
 
   case "$PKG_MGR" in
@@ -31,11 +32,11 @@ install_openvpn_packages() {
       pacman -Sy --noconfirm openvpn easy-rsa openssl iptables curl qrencode
       ;;
     *)
-      die "Package manager $PKG_MGR belum didukung untuk instalasi OpenVPN otomatis."
+      die "$(T "Package manager $PKG_MGR is not supported for automatic OpenVPN install." "Package manager $PKG_MGR belum didukung untuk instalasi OpenVPN otomatis.")"
       ;;
   esac
 
-  log_success "Paket OpenVPN terinstal."
+  log_success "$(T "OpenVPN packages installed." "Paket OpenVPN terinstal.")"
 }
 
 ovpn_setup_server() {
@@ -47,12 +48,12 @@ ovpn_setup_server() {
   mkdir -p "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
   chmod 700 "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
 
-  log_step "Menyiapkan Public Key Infrastructure (PKI) OpenVPN..."
+  log_step "$(T "Setting up the OpenVPN Public Key Infrastructure (PKI)..." "Menyiapkan Public Key Infrastructure (PKI) OpenVPN...")"
   local easyrsa_dir="/etc/openvpn/easy-rsa"
   rm -rf "$easyrsa_dir"
   mkdir -p "$easyrsa_dir"
 
-  # Cari template easy-rsa
+  # Locate the easy-rsa template
   local src_easyrsa=""
   for p in /usr/share/easy-rsa /usr/share/easy-rsa/3* /usr/share/doc/easy-rsa; do
     if [[ -d "$p" && -f "$p/easyrsa" ]]; then
@@ -62,18 +63,18 @@ ovpn_setup_server() {
   done
 
   if [[ -z "$src_easyrsa" ]]; then
-    # Cari dengan find jika lokasi bervariasi antar distro
+    # Fall back to find when the location varies between distros
     src_easyrsa="$(find /usr -type f -name easyrsa 2>/dev/null | head -n1 | xargs -r dirname)"
   fi
 
   if [[ -z "$src_easyrsa" || ! -f "$src_easyrsa/easyrsa" ]]; then
-    die "Biner easy-rsa tidak ditemukan. Pastikan paket easy-rsa sudah terpasang."
+    die "$(T "The easy-rsa binary was not found. Make sure the easy-rsa package is installed." "Biner easy-rsa tidak ditemukan. Pastikan paket easy-rsa sudah terpasang.")"
   fi
 
   cp -r "$src_easyrsa"/* "$easyrsa_dir/"
-  cd "$easyrsa_dir" || die "Gagal masuk $easyrsa_dir"
+  cd "$easyrsa_dir" || die "$(T "Cannot enter $easyrsa_dir" "Gagal masuk $easyrsa_dir")"
 
-  # Inisialisasi PKI non-interaktif
+  # Non-interactive PKI init
   export EASYRSA_BATCH=1
   export EASYRSA_CERT_EXPIRE=3650
   ./easyrsa init-pki
@@ -82,14 +83,14 @@ ovpn_setup_server() {
   ./easyrsa build-server-full server nopass
   openvpn --genkey secret "$OVPN_SERVER_DIR/tc.key"
 
-  # Salin certs ke server dir
+  # Copy certs into the server dir
   cp pki/ca.crt "$OVPN_SERVER_DIR/"
   cp pki/dh.pem "$OVPN_SERVER_DIR/"
   cp pki/issued/server.crt "$OVPN_SERVER_DIR/"
   cp pki/private/server.key "$OVPN_SERVER_DIR/"
   chmod 600 "$OVPN_SERVER_DIR/server.key" "$OVPN_SERVER_DIR/tc.key"
 
-  # Tulis konfigurasi server
+  # Write the server config
   cat > "$OVPN_SERVER_DIR/server.conf" <<EOF
 port $port
 proto $proto
@@ -122,7 +123,7 @@ status /var/log/openvpn-status.log
 verb 3
 explicit-exit-notify 1
 EOF
-  # explicit-exit-notify hanya valid untuk UDP — hapus bila protokol TCP
+  # explicit-exit-notify is only valid for UDP — remove it for TCP
   if [[ "$proto" != "udp" ]]; then
     sed -i '/^explicit-exit-notify/d' "$OVPN_SERVER_DIR/server.conf"
   fi
@@ -132,7 +133,7 @@ EOF
     sed -i 's/group nogroup/group nobody/' "$OVPN_SERVER_DIR/server.conf"
   fi
 
-  # Simpan params OpenVPN
+  # Save OpenVPN params
   cat > "$OVPN_PARAMS" <<EOF
 OVPN_PUB_IP="$pub_ip"
 OVPN_PORT="$port"
@@ -141,8 +142,8 @@ OVPN_IFACE="$iface"
 EOF
   chmod 600 "$OVPN_PARAMS"
 
-  # Aktifkan service
-  log_step "Mengaktifkan service OpenVPN..."
+  # Enable the service
+  log_step "$(T "Enabling the OpenVPN service..." "Mengaktifkan service OpenVPN...")"
   if systemctl list-unit-files | grep -q "openvpn-server@"; then
     systemctl daemon-reload
     systemctl enable openvpn-server@server.service
@@ -153,26 +154,26 @@ EOF
     systemctl restart openvpn@server.service
   fi
 
-  # Buka firewall
+  # Open the firewall
   open_firewall_port "$port" "$proto"
 
-  # Aturan NAT untuk OpenVPN
+  # NAT rules for OpenVPN
   iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o "$iface" -j MASQUERADE 2>/dev/null || true
   iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT 2>/dev/null || true
   iptables -I FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 
-  log_success "OpenVPN server berhasil disiapkan pada port $port/$proto."
+  log_success "$(T "OpenVPN server is ready on port $port/$proto." "OpenVPN server berhasil disiapkan pada port $port/$proto.")"
 }
 
 ovpn_create_client() {
   local name="$1"
   validate_client_name "$name"
-  [[ -f "$OVPN_PARAMS" ]] || die "OpenVPN belum terpasang. Jalankan setup server dulu."
+  [[ -f "$OVPN_PARAMS" ]] || die "$(T "OpenVPN is not installed yet. Run the server setup first." "OpenVPN belum terpasang. Jalankan setup server dulu.")"
   # shellcheck disable=SC1090
   source "$OVPN_PARAMS"
 
   local easyrsa_dir="/etc/openvpn/easy-rsa"
-  cd "$easyrsa_dir" || die "Direktori $easyrsa_dir tidak ditemukan."
+  cd "$easyrsa_dir" || die "$(T "Directory $easyrsa_dir was not found." "Direktori $easyrsa_dir tidak ditemukan.")"
 
   export EASYRSA_BATCH=1
   export EASYRSA_CERT_EXPIRE=3650
@@ -212,7 +213,7 @@ $(cat "$OVPN_SERVER_DIR/tc.key")
 EOF
   chmod 600 "$client_conf"
 
-  log_success "Client OpenVPN '$name' berhasil dibuat di: $client_conf"
+  log_success "$(T "OpenVPN client '$name' created at: $client_conf" "Client OpenVPN '$name' berhasil dibuat di: $client_conf")"
   LAST_OVPN_CONF="$client_conf"
 }
 
@@ -231,5 +232,5 @@ ovpn_remove_client() {
   fi
 
   rm -f "$OVPN_CLIENTS_DIR/${name}.ovpn"
-  log_success "Client OpenVPN '$name' dicabut dan filenya dihapus."
+  log_success "$(T "OpenVPN client '$name' revoked and its file removed." "Client OpenVPN '$name' dicabut dan filenya dihapus.")"
 }

@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# lib/ssh.sh — Modul SSH VPN (Dropbear/OpenSSH + WebSocket tunneling)
+# lib/ssh.sh — SSH VPN module (Dropbear/OpenSSH + WebSocket tunneling, bilingual EN/ID)
+# Branding: wrwb Store
 #
-# SSH adalah protokol tunneling default kedua setelah WireGuard:
-#   - Mudah dipakai client apa pun (OpenSSH client, Termius, dsb.)
-#   - Mendukung direct SSH (port 22/tcp) dan SSH over WebSocket (port 80/443)
-#   - Manajemen user via add-ssh-user.sh / remove-ssh-user.sh
+# SSH is the second default tunneling protocol after WireGuard:
+#   - Easy with any client (OpenSSH client, Termius, etc.)
+#   - Supports direct SSH (port 22/tcp) and SSH over WebSocket (port 80/443)
+#   - User management via add-ssh-user.sh / remove-ssh-user.sh
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
+  echo "This file is a library. Do not run it directly." >&2
   exit 1
 fi
 
@@ -20,7 +21,7 @@ STUNNEL_CONF="/etc/stunnel/stunnel.conf"
 WS_SERVICE="ssh-ws"
 
 install_ssh_packages() {
-  log_step "Menginstal komponen SSH VPN (OpenSSH, Dropbear, Stunnel, WebSocket)..."
+  log_step "$(T "Installing SSH VPN components (OpenSSH, Dropbear, Stunnel, WebSocket)..." "Menginstal komponen SSH VPN (OpenSSH, Dropbear, Stunnel, WebSocket)...")"
   detect_os
 
   case "$PKG_MGR" in
@@ -39,7 +40,7 @@ install_ssh_packages() {
       pacman -Sy --noconfirm openssh dropbear stunnel python3 curl qrencode iptables
       ;;
     *)
-      die "Package manager $PKG_MGR belum didukung untuk instalasi SSH otomatis."
+      die "$(T "Package manager $PKG_MGR is not supported for automatic SSH install." "Package manager $PKG_MGR belum didukung untuk instalasi SSH otomatis.")"
       ;;
   esac
 
@@ -48,14 +49,14 @@ install_ssh_packages() {
   touch "$SSH_ACCOUNTS_DB"
   chmod 600 "$SSH_ACCOUNTS_DB"
 
-  log_success "Paket SSH VPN terinstal."
+  log_success "$(T "SSH VPN packages installed." "Paket SSH VPN terinstal.")"
 }
 
 ssh_harden_config() {
-  log_step "Mengeraskan konfigurasi OpenSSH server..."
+  log_step "$(T "Hardening the OpenSSH server config..." "Mengeraskan konfigurasi OpenSSH server...")"
 
   local sshd_conf="/etc/ssh/sshd_config"
-  [[ -f "$sshd_conf" ]] || die "File $sshd_conf tidak ditemukan setelah instalasi openssh-server."
+  [[ -f "$sshd_conf" ]] || die "$(T "File $sshd_conf was not found after installing openssh-server." "File $sshd_conf tidak ditemukan setelah instalasi openssh-server.")"
 
   cp "$sshd_conf" "$sshd_conf.bak.$(date +%Y%m%d%H%M%S)"
 
@@ -79,7 +80,7 @@ ClientAliveCountMax 2
 AllowTcpForwarding yes
 EOF
 
-  sshd -t || die "Konfigurasi sshd tidak valid setelah hardening. Cek $sshd_conf."
+  sshd -t || die "$(T "sshd config is invalid after hardening. Check $sshd_conf." "Konfigurasi sshd tidak valid setelah hardening. Cek $sshd_conf.")"
 
   if systemctl list-unit-files | grep -q "^sshd\.service"; then
     systemctl enable sshd >/dev/null 2>&1 || true
@@ -89,15 +90,15 @@ EOF
     systemctl restart ssh
   fi
 
-  log_success "OpenSSH server dikeraskan & dijalankan ulang."
+  log_success "$(T "OpenSSH server hardened & restarted." "OpenSSH server dikeraskan & dijalankan ulang.")"
 }
 
 ssh_setup_dropbear() {
   local port="${1:-143}"
-  log_step "Mengonfigurasi Dropbear di port $port..."
+  log_step "$(T "Configuring Dropbear on port $port..." "Mengonfigurasi Dropbear di port $port...")"
 
   if ! command -v dropbear &>/dev/null; then
-    log_warn "Dropbear tidak tersedia di sistem ini, melewati setup Dropbear."
+    log_warn "$(T "Dropbear is not available on this system, skipping Dropbear setup." "Dropbear tidak tersedia di sistem ini, melewati setup Dropbear.")"
     return 0
   fi
 
@@ -128,16 +129,16 @@ EOF
   fi
 
   open_firewall_port "$port" "tcp"
-  log_success "Dropbear dikonfigurasi di port $port."
+  log_success "$(T "Dropbear configured on port $port." "Dropbear dikonfigurasi di port $port.")"
 }
 
 ssh_setup_stunnel() {
   local ssl_port="${1:-444}"
   local ssh_port="${2:-22}"
-  log_step "Mengonfigurasi Stunnel (SSH over TLS) $ssl_port -> 127.0.0.1:$ssh_port..."
+  log_step "$(T "Configuring Stunnel (SSH over TLS) $ssl_port -> 127.0.0.1:$ssh_port..." "Mengonfigurasi Stunnel (SSH over TLS) $ssl_port -> 127.0.0.1:$ssh_port...")"
 
   if ! command -v stunnel4 &>/dev/null && ! command -v stunnel &>/dev/null; then
-    log_warn "Stunnel tidak tersedia di sistem ini, melewati setup Stunnel."
+    log_warn "$(T "Stunnel is not available on this system, skipping Stunnel setup." "Stunnel tidak tersedia di sistem ini, melewati setup Stunnel.")"
     return 0
   fi
 
@@ -191,15 +192,15 @@ EOF
   systemctl restart stunnel4
 
   open_firewall_port "$ssl_port" "tcp"
-  log_success "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port."
+  log_success "$(T "Stunnel active: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port.")"
 }
 
-# WebSocket bridge: meneruskan WS (port 80) ke SSH lokal (port 22).
-# Dipakai aplikasi tunneling (HTTP Custom, dsb.) dengan payload WS standar.
+# WebSocket bridge: forwards WS (port 80) to local SSH (port 22).
+# Used by tunneling apps (HTTP Custom, etc.) with a standard WS payload.
 ssh_setup_websocket() {
   local ws_port="${1:-80}"
   local ssh_port="${2:-22}"
-  log_step "Memasang SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..."
+  log_step "$(T "Installing the SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..." "Memasang SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)...")"
 
   local ws_script="/usr/local/bin/ssh-ws.py"
   cat > "$ws_script" <<EOF
@@ -297,7 +298,7 @@ EOF
   systemctl restart ssh-ws
 
   open_firewall_port "$ws_port" "tcp"
-  log_success "SSH WebSocket bridge aktif di port $ws_port."
+  log_success "$(T "SSH WebSocket bridge is active on port $ws_port." "SSH WebSocket bridge aktif di port $ws_port.")"
 }
 
 ssh_setup_server() {
@@ -324,16 +325,16 @@ WS_PORT="$ws_port"
 EOF
   chmod 600 "$SSH_PARAMS"
 
-  log_success "SSH VPN aktif — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port"
+  log_success "$(T "SSH VPN active — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port" "SSH VPN aktif — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port")"
 
   echo ""
-  echo "==================== INFORMASI AKUN SSH ===================="
-  echo " Host / IP        : $pub_ip"
-  echo " Port OpenSSH     : $ssh_port (direct)"
-  echo " Port Dropbear    : $dropbear_port"
-  echo " Port SSH over TLS: $ssl_port (Stunnel)"
-  echo " Port SSH over WS : $ws_port (payload WebSocket)"
-  echo " Buat akun baru   : sudo ./add-ssh-user.sh <username>"
+  echo "==================== $(T "SSH ACCOUNT INFO" "INFORMASI AKUN SSH") ===================="
+  echo " $(T "Host / IP        : $pub_ip" "Host / IP        : $pub_ip")"
+  echo " $(T "OpenSSH port     : $ssh_port (direct)" "Port OpenSSH     : $ssh_port (direct)")"
+  echo " $(T "Dropbear port    : $dropbear_port" "Port Dropbear    : $dropbear_port")"
+  echo " $(T "SSH over TLS port: $ssl_port (Stunnel)" "Port SSH over TLS: $ssl_port (Stunnel)")"
+  echo " $(T "SSH over WS port : $ws_port (WebSocket payload)" "Port SSH over WS : $ws_port (payload WebSocket)")"
+  echo " $(T "Create new account: sudo ./add-ssh-user.sh <username>" "Buat akun baru   : sudo ./add-ssh-user.sh <username>")"
   echo "============================================================"
 }
 
@@ -351,7 +352,7 @@ ssh_create_user() {
   validate_client_name "$user"
 
   if ssh_user_exists "$user"; then
-    die "User sistem '$user' sudah ada. Pilih nama lain."
+    die "$(T "System user '$user' already exists. Pick another name." "User sistem '$user' sudah ada. Pilih nama lain.")"
   fi
 
   if [[ -z "$password" ]]; then
@@ -363,15 +364,15 @@ ssh_create_user() {
   local expire_date
   expire_date="$(date -d "+${days} days" +%Y-%m-%d 2>/dev/null || date -v+${days}d +%Y-%m-%d 2>/dev/null || echo "")"
   if [[ -z "$expire_date" ]]; then
-    die "Gagal menghitung tanggal kedaluwarsa."
+    die "$(T "Failed to compute the expiry date." "Gagal menghitung tanggal kedaluwarsa.")"
   fi
 
-  # Buat user tanpa akses shell interaktif penuh (nologin) tapi boleh port-forwarding
+  # Create the user without full interactive shell access (nologin) but allow port-forwarding
   useradd -e "$expire_date" -s /usr/sbin/nologin -M "$user" || \
     useradd -e "$expire_date" -s /bin/false -M "$user"
   echo "${user}:${password}" | chpasswd
 
-  # Catat ke database akun (untuk list & hapus massal)
+  # Record in the account database (for list & bulk removal)
   local created
   created="$(date +%Y-%m-%d)"
   if grep -q "^${user}:" "$SSH_ACCOUNTS_DB" 2>/dev/null; then
@@ -384,7 +385,7 @@ ssh_create_user() {
   SSH_LAST_EXPIRE="$expire_date"
   export SSH_LAST_USER SSH_LAST_PASS SSH_LAST_EXPIRE
 
-  log_success "Akun SSH '$user' dibuat (berlaku s/d $expire_date)."
+  log_success "$(T "SSH account '$user' created (valid until $expire_date)." "Akun SSH '$user' dibuat (berlaku s/d $expire_date).")"
 }
 
 ssh_remove_user() {
@@ -392,23 +393,23 @@ ssh_remove_user() {
   validate_client_name "$user"
 
   if ! ssh_user_exists "$user"; then
-    die "User '$user' tidak ditemukan di sistem."
+    die "$(T "User '$user' was not found on the system." "User '$user' tidak ditemukan di sistem.")"
   fi
 
-  # Matikan sesi aktif user tersebut
+  # Kill the user's active sessions
   pkill -u "$user" 2>/dev/null || true
   userdel -r "$user" 2>/dev/null || userdel "$user"
   sed -i "/^${user}:/d" "$SSH_ACCOUNTS_DB" 2>/dev/null || true
   rm -f "$SSH_DIR/.last-pass-$user"
 
-  log_success "Akun SSH '$user' berhasil dihapus."
+  log_success "$(T "SSH account '$user' removed." "Akun SSH '$user' berhasil dihapus.")"
 }
 
 ssh_list_users() {
   echo "======================================================================"
-  echo -e "${_C_BOLD}DAFTAR AKUN SSH VPN${_C_RESET}"
+  echo -e "${_C_BOLD}$(T "SSH VPN ACCOUNT LIST" "DAFTAR AKUN SSH VPN")${_C_RESET}"
   echo "======================================================================"
-  printf "%-18s %-14s %-14s %-12s\n" "USERNAME" "DIBUAT" "KEDALUWARSA" "STATUS"
+  printf "%-18s %-14s %-14s %-12s\n" "USERNAME" "$(T "CREATED" "DIBUAT")" "$(T "EXPIRES" "KEDALUWARSA")" "STATUS"
   echo "----------------------------------------------------------------------"
 
   local count=0 expired=0
@@ -418,12 +419,12 @@ ssh_list_users() {
   if [[ -s "$SSH_ACCOUNTS_DB" ]]; then
     while IFS=: read -r user created expire _rest; do
       [[ -z "$user" ]] && continue
-      local status="AKTIF"
+      local status="$(T "ACTIVE" "AKTIF")"
       if [[ "$expire" < "$today" ]]; then
-        status="KEDALUWARSA"
+        status="$(T "EXPIRED" "KEDALUWARSA")"
         ((expired++)) || true
       elif ! id "$user" &>/dev/null; then
-        status="HILANG"
+        status="$(T "MISSING" "HILANG")"
       fi
       printf "%-18s %-14s %-14s %-12s\n" "$user" "$created" "$expire" "$status"
       ((count++)) || true
@@ -431,9 +432,9 @@ ssh_list_users() {
   fi
 
   if [[ "$count" -eq 0 ]]; then
-    echo " (Belum ada akun SSH yang terdaftar)"
+    echo " ($(T "No SSH accounts registered yet" "Belum ada akun SSH yang terdaftar"))"
   fi
   echo "----------------------------------------------------------------------"
-  echo "Total akun: $count (kedaluwarsa: $expired)"
+  echo "$(T "Total accounts: $count (expired: $expired)" "Total akun: $count (kedaluwarsa: $expired)")"
   echo "======================================================================"
 }

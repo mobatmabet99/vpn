@@ -1,19 +1,29 @@
 #!/bin/bash
 #
-# lib/common.sh — Fungsi bersama untuk semua skrip VPN
-# Didukung: Ubuntu 20.04/22.04/24.04/26.04, Debian 10/11/12/13,
-#           CentOS / Rocky / AlmaLinux 8/9, RHEL 8/9
+# lib/common.sh — Shared functions for all VPN scripts (English default, Indonesian optional)
+# Supported: Ubuntu 20.04/22.04/24.04/26.04, Debian 10/11/12/13,
+#            CentOS / Rocky / AlmaLinux 8/9, RHEL 8/9
+# Branding: wrwb Store
 #
-# Cara pakai di skrip lain:
+# Usage in other scripts:
 #   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   source "$SCRIPT_DIR/lib/common.sh"
+#
+# Language: common.sh auto-loads lib/lang.sh, so every script that sources
+# this file gets bilingual support (default: English). See lib/lang.sh.
 
-# Jangan dieksekusi langsung
+# Do not execute directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "File ini adalah library. Jangan dijalankan langsung." >&2
-  echo "Source dari skrip lain: source \"\$(dirname \"\$0\")/lib/common.sh\"" >&2
+  echo "This file is a library. Do not run it directly." >&2
+  echo "Source it from another script: source \"\$(dirname \"\$0\")/lib/common.sh\"" >&2
   exit 1
 fi
+
+# Load language framework first (English default, persists in /etc/vpn/lang)
+_COMMON_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lang.sh
+source "$_COMMON_LIB_DIR/lang.sh"
+lang_load
 
 # ---------------------------------------------------------------- colors/log
 if [[ -t 1 ]] && command -v tput &>/dev/null; then
@@ -35,20 +45,20 @@ log_step()    { echo -e "\n${_C_BOLD}${_C_GREEN}==>${_C_RESET}${_C_BOLD} $*${_C_
 
 die() { log_error "$*"; exit 1; }
 
-# ------------------------------------------------------------ root & dasar
+# ------------------------------------------------------------ root & basics
 need_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    die "Skrip ini harus dijalankan sebagai root. Coba: sudo $0 $*"
+    die "$(T "This script must be run as root. Try: sudo $0 $*" "Skrip ini harus dijalankan sebagai root. Coba: sudo $0 $*")"
   fi
 }
 
 require_cmd() {
   local cmd="$1"
-  command -v "$cmd" &>/dev/null || die "Perintah '$cmd' tidak ditemukan. Jalankan install.sh dulu."
+  command -v "$cmd" &>/dev/null || die "$(T "Command '$cmd' not found. Run install.sh first." "Perintah '$cmd' tidak ditemukan. Jalankan install.sh dulu.")"
 }
 
 confirm() {
-  local prompt="${1:-Lanjutkan? [y/N]} "
+  local prompt="${1:-$(T "Continue? [y/N] " "Lanjutkan? [y/N] ")}"
   local ans
   if [[ "${AUTO_YES:-0}" == "1" ]]; then
     return 0
@@ -110,11 +120,11 @@ detect_os() {
 }
 
 print_os_info() {
-  log_info "OS terdeteksi : $OS_NAME (id=$OS_ID ver=$OS_VERSION_ID family=$OS_FAMILY)"
-  log_info "Package mgr   : $PKG_MGR | Firewall tool: $FIREWALL_TOOL"
+  log_info "$(T "Detected OS : $OS_NAME (id=$OS_ID ver=$OS_VERSION_ID family=$OS_FAMILY)" "OS terdeteksi : $OS_NAME (id=$OS_ID ver=$OS_VERSION_ID family=$OS_FAMILY)")"
+  log_info "$(T "Package mgr : $PKG_MGR | Firewall tool: $FIREWALL_TOOL" "Package mgr   : $PKG_MGR | Firewall tool: $FIREWALL_TOOL")"
 }
 
-# Kembalikan 0 jika OS didukung resmi, 1 jika belum teruji (tapi keluarga dikenal)
+# Returns 0 when the OS is officially supported, 1 when untested (but known family)
 is_supported_os() {
   case "$OS_ID" in
     ubuntu)
@@ -146,19 +156,19 @@ check_os_supported() {
   detect_os
   print_os_info
   if is_supported_os; then
-    log_success "Distro didukung resmi."
+    log_success "$(T "Distro is officially supported." "Distro didukung resmi.")"
   else
-    log_warn "Distro $OS_ID $OS_VERSION_ID belum masuk daftar teruji."
-    log_warn "Keluarga $OS_FAMILY tetap dicoba. Lanjutkan dengan risiko sendiri."
+    log_warn "$(T "Distro $OS_ID $OS_VERSION_ID is not on the tested list." "Distro $OS_ID $OS_VERSION_ID belum masuk daftar teruji.")"
+    log_warn "$(T "Family $OS_FAMILY will still be attempted. Continue at your own risk." "Keluarga $OS_FAMILY tetap dicoba. Lanjutkan dengan risiko sendiri.")"
     if [[ "${FORCE_OS:-0}" != "1" && "${AUTO_YES:-0}" != "1" ]]; then
-      confirm "Tetap lanjutkan instalasi? [y/N] " || die "Instalasi dibatalkan oleh pengguna."
+      confirm "$(T "Continue installation anyway? [y/N] " "Tetap lanjutkan instalasi? [y/N] ")" || die "$(T "Installation cancelled by user." "Instalasi dibatalkan oleh pengguna.")"
     fi
   fi
 }
 
 check_tun() {
   if [[ ! -c /dev/net/tun ]]; then
-    die "/dev/net/tun tidak tersedia. Aktifkan TUN di VPS panel (umumnya di OpenVZ/LXC) lalu coba lagi."
+    die "$(T "/dev/net/tun is not available. Enable TUN in your VPS panel (usually OpenVZ/LXC), then try again." "/dev/net/tun tidak tersedia. Aktifkan TUN di VPS panel (umumnya di OpenVZ/LXC) lalu coba lagi.")"
   fi
 }
 
@@ -166,14 +176,14 @@ check_virt() {
   if command -v systemd-detect-virt &>/dev/null; then
     local v
     v="$(systemd-detect-virt 2>/dev/null || true)"
-    [[ -n "$v" && "$v" != "none" ]] && log_info "Virtualisasi terdeteksi: $v"
+    [[ -n "$v" && "$v" != "none" ]] && log_info "$(T "Virtualization detected: $v" "Virtualisasi terdeteksi: $v")"
   fi
 }
 
 # ------------------------------------------------------------------ network
 get_default_iface() {
   local iface=""
-  # Pakai awk (portabel) — grep -P tidak tersedia di semua distro (Alpine, RHEL minimal, dsb.)
+  # awk (portable) — grep -P is missing on some distros (Alpine, minimal RHEL, etc.)
   iface="$(ip -4 route ls 2>/dev/null | awk '/^default/ {for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
   if [[ -z "$iface" ]]; then
     iface="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
@@ -190,8 +200,9 @@ get_public_ip() {
       return 0
     fi
   done
-  # fallback: IP dari route (bisa IP privat/NAT)
-  ip="$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP '(?<=src )(\S+)' | head -n1 || true)"
+  # fallback: IP from route table (may be a private/NAT address)
+  # Portable awk instead of grep -oP (unavailable on Alpine/minimal RHEL)
+  ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' | head -n1 || true)"
   echo "${ip:-127.0.0.1}"
 }
 
@@ -219,19 +230,19 @@ gen_password() {
 
 validate_client_name() {
   local name="$1"
-  [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || die "Nama client tidak valid '$name'. Gunakan huruf/angka/dash/underscore saja."
-  [[ "${#name}" -le 32 ]] || die "Nama client maksimal 32 karakter."
+  [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || die "$(T "Invalid client name '$name'. Use letters/numbers/dash/underscore only." "Nama client tidak valid '$name'. Gunakan huruf/angka/dash/underscore saja.")"
+  [[ "${#name}" -le 32 ]] || die "$(T "Client name must be 32 characters or fewer." "Nama client maksimal 32 karakter.")"
 }
 
 # ------------------------------------------------------- params file helper
-# Format file params: KEY="value" per baris, disource oleh add/remove client.
+# Params file format: KEY="value" per line, sourced by add/remove clients.
 PARAMS_FILE_DEFAULT="/etc/wireguard/params"
 
 save_params() {
   local file="${1:-$PARAMS_FILE_DEFAULT}"
   mkdir -p "$(dirname "$file")"
   cat > "$file" <<EOF
-# Dibuat otomatis oleh install.sh — jangan edit manual kecuali paham risikonya
+# Auto-generated by install.sh (wrwb Store) — do not edit manually unless you know the risks
 SERVER_PUB_IP="$SERVER_PUB_IP"
 SERVER_PORT="$SERVER_PORT"
 SERVER_PUB_KEY="$SERVER_PUB_KEY"
@@ -243,14 +254,14 @@ WG_CONF="$WG_CONF"
 CLIENT_DIR="$CLIENT_DIR"
 EOF
   chmod 600 "$file"
-  log_success "Parameter server disimpan di $file"
+  log_success "$(T "Server parameters saved to $file" "Parameter server disimpan di $file")"
 }
 
 load_params() {
   local file="${1:-$PARAMS_FILE_DEFAULT}"
-  [[ -f "$file" ]] || die "File params $file tidak ditemukan. Jalankan ./install.sh dulu."
+  [[ -f "$file" ]] || die "$(T "Params file $file not found. Run ./install.sh first." "File params $file tidak ditemukan. Jalankan ./install.sh dulu.")"
   # shellcheck disable=SC1090
   source "$file"
-  [[ -n "${SERVER_PUB_KEY:-}" ]] || die "Params rusak: SERVER_PUB_KEY kosong."
+  [[ -n "${SERVER_PUB_KEY:-}" ]] || die "$(T "Params are corrupt: SERVER_PUB_KEY is empty." "Params rusak: SERVER_PUB_KEY kosong.")"
   [[ -n "${WG_CONF:-}" ]] || WG_CONF="/etc/wireguard/wg0.conf"
 }
