@@ -189,7 +189,7 @@ XRAY_ENGINE=v2ray sudo ./install.sh --yes
 | `--with-openvpn` | 安装 OpenVPN **替代** SSH (互斥，可手动组合) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | 选择隧道引擎 (默认 Xray)。`--with-v2ray` = v2ray-core 引擎 |
 | `--with-shadowsocks` | 同时安装 Shadowsocks (默认：不装) |
-| `--lang en\|id\|zh` | 安装语言 (默认 en)。也可用 `VPN_LANG=en\|id\|zh` 环境变量 |
+| `--lang en|id|zh` | 安装语言 (默认 en)。也可用 `VPN_LANG=en|id|zh` 环境变量 |
 | `-p/-c/-d/-y` | WG 端口、首个客户端名、DNS、非交互模式 |
 
 ### 3. `install.sh` 执行顺序
@@ -352,12 +352,12 @@ sudo ./uninstall.sh
 | `/dev/net/tun not available` | OpenVZ/LXC VPS 无 TUN。请在服务商面板启用 TUN，或换 KVM VPS。 |
 | `wg-quick@wg0 failed to start` | 看日志：`journalctl -u wg-quick@wg0 -n 50 --no-pager`。多为端口冲突 — 安装时换端口。 |
 | 客户端能连但上不了网 | 确认转发已开 (`cat /proc/sys/net/ipv4/ip_forward` 应为 `1`)，检查 NAT (`iptables -t nat -L -n`)，云防火墙放行 UDP 端口。 |
-| `Port already in use` | 安装程序会自动警告 — 用 `ss -lnup \| grep 51820` 检查，通过 `./install.sh --port 51821` 换端口。 |
+| `Port already in use` | 安装程序会自动警告 — 用 `ss -lnup | grep 51820` 检查，通过 `./install.sh --port 51821` 换端口。 |
 | `xray` 服务启动失败 | 校验配置：`/usr/local/bin/xray run -test -config /etc/xray/config.json`；看日志 `journalctl -u xray -n 50 --no-pager` (多为 443 被 Web 服务占用)。 |
 | REALITY 连不上 | 确认服务器时间准确 (NTP)，`serverNames` SNI 与客户端 `serverName` 一致，`pbk`/`sid` 从服务端链接完整复制。 |
 | 终端不显示二维码 | 终端不支持 ANSI-UTF8 — 用 `/etc/wireguard/clients/<name>/` 下 PNG 文件，或手动复制 Xray 链接。 |
 | 新系统 (如 Ubuntu 26 / Debian 13) 提示 "untested" | 输入 `y` 继续，或设置 `FORCE_OS=1`。欢迎通过 Issues 反馈，便于更新官方支持列表。 |
-| 语言不对 | 重新 `sudo ./menu.sh` → 17，或 `VPN_LANG=zh sudo ./status.sh`，或 `echo zh \| sudo tee /etc/vpn/lang`。 |
+| 语言不对 | 重新 `sudo ./menu.sh` → 17，或 `VPN_LANG=zh sudo ./status.sh`，或 `echo zh | sudo tee /etc/vpn/lang`。 |
 
 ---
 

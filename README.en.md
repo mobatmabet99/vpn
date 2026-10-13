@@ -192,7 +192,7 @@ See all options:
 | `--with-openvpn` | Install OpenVPN **instead of** SSH (mutually exclusive, can combine manually) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pick tunnel engine (default: Xray). `--with-v2ray` = v2ray-core engine |
 | `--with-shadowsocks` | Also add Shadowsocks (default: no) |
-| `--lang en\|id\|zh` | Installer language (default: en). Also `VPN_LANG=en\|id\|zh` env |
+| `--lang en|id|zh` | Installer language (default: en). Also `VPN_LANG=en|id|zh` env |
 | `-p/-c/-d/-y` | WG port, first client name, DNS, non-interactive mode |
 
 ### 3. What `install.sh` does in order
@@ -357,12 +357,12 @@ sudo ./uninstall.sh
 | `/dev/net/tun not available` | OpenVZ/LXC VPS without TUN. Enable TUN in provider panel, or move to KVM VPS. |
 | `wg-quick@wg0 failed to start` | See log: `journalctl -u wg-quick@wg0 -n 50 --no-pager`. Usually port conflict — change port at install. |
 | Client connects but no internet | Ensure forwarding is on (`cat /proc/sys/net/ipv4/ip_forward` must be `1`), check NAT (`iptables -t nat -L -n`), and open UDP port in cloud firewall. |
-| `Port already in use` | Installer warns automatically — check with `ss -lnup \| grep 51820`, pick another port via `./install.sh --port 51821`. |
+| `Port already in use` | Installer warns automatically — check with `ss -lnup | grep 51820`, pick another port via `./install.sh --port 51821`. |
 | `xray` service fails to start | Validate config: `/usr/local/bin/xray run -test -config /etc/xray/config.json`; see log `journalctl -u xray -n 50 --no-pager` (usually port 443 taken by a web server). |
 | REALITY won't connect | Ensure server clock is accurate (NTP), `serverNames` SNI matches client `serverName`, and `pbk`/`sid` copied exactly from server link. |
 | QR missing in terminal | Terminal lacks ANSI-UTF8 — use PNG file in `/etc/wireguard/clients/<name>/` or copy Xray link manually. |
 | New OS (e.g. Ubuntu 26 / Debian 13) warns "untested" | Continue with `y`, or set `FORCE_OS=1`. Report results via Issues so the official list can be updated. |
-| Wrong language | Re-run `sudo ./menu.sh` → 17, or `VPN_LANG=zh sudo ./status.sh`, or `echo zh \| sudo tee /etc/vpn/lang`. |
+| Wrong language | Re-run `sudo ./menu.sh` → 17, or `VPN_LANG=zh sudo ./status.sh`, or `echo zh | sudo tee /etc/vpn/lang`. |
 
 ---
 

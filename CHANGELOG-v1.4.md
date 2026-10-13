@@ -1,6 +1,6 @@
 # Changelog v1.4 — Trilingual EN/ID/ZH, Default English (wrwb Store)
 
-Date: 14 October 2026 / Tanggal: 14 Oktober 2026 / 日期：2026年10月14日
+Date: 13 October 2026 / Tanggal: 13 Oktober 2026 / 日期：2026年10月13日
 Made by **wrwb Store** / Dibuat oleh **wrwb Store** / 由 **wrwb Store** 打造
 
 ## Summary / Ringkasan / 概述

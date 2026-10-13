@@ -197,7 +197,7 @@ Lihat semua opsi:
 | `--with-openvpn` | Pasang OpenVPN **pengganti** SSH (saling eksklusif, bisa dikombinasi manual) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pilih engine tunnel (default: Xray). `--with-v2ray` = engine v2ray-core |
 | `--with-shadowsocks` | Tambah Shadowsocks sekalian (default: tidak) |
-| `--lang en\|id\|zh` | Bahasa instalasi (default: en). Juga via env `VPN_LANG=en\|id\|zh` |
+| `--lang en|id|zh` | Bahasa instalasi (default: en). Juga via env `VPN_LANG=en|id|zh` |
 | `-p/-c/-d/-y` | Port WG, nama client pertama, DNS, mode non-interaktif |
 
 ### 3. Apa yang dilakukan `install.sh` secara berurutan
@@ -362,12 +362,12 @@ sudo ./uninstall.sh
 | `/dev/net/tun tidak tersedia` | VPS OpenVZ/LXC tanpa TUN. Aktifkan TUN di panel provider, atau pindah ke VPS KVM. |
 | `wg-quick@wg0 gagal berjalan` | Lihat log: `journalctl -u wg-quick@wg0 -n 50 --no-pager`. Umumnya karena port bentrok — ganti port saat instalasi. |
 | Client connect tapi tidak bisa internet | Pastikan forwarding aktif (`cat /proc/sys/net/ipv4/ip_forward` harus `1`), cek NAT (`iptables -t nat -L -n`), dan pastikan firewall cloud provider membuka port UDP. |
-| `Port sudah dipakai` | Instalasi otomatis memberi peringatan — cek dengan `ss -lnup \| grep 51820`, pilih port lain via `./install.sh --port 51821`. |
+| `Port sudah dipakai` | Instalasi otomatis memberi peringatan — cek dengan `ss -lnup | grep 51820`, pilih port lain via `./install.sh --port 51821`. |
 | Service `xray` gagal start | Validasi config: `/usr/local/bin/xray run -test -config /etc/xray/config.json`; lihat log `journalctl -u xray -n 50 --no-pager` (umumnya port 443 bentrok dengan web server). |
 | REALITY tidak connect | Pastikan jam server akurat (NTP), SNI `serverNames` cocok dengan `serverName` client, dan `pbk`/`sid` disalin persis dari link server. |
 | QR tidak tampil di terminal | Terminal tidak dukung ANSI-UTF8 — gunakan file PNG di `/etc/wireguard/clients/<nama>/` atau salin link Xray manual. |
 | OS baru (mis. Ubuntu 26 / Debian 13) diperingatkan "belum teruji" | Lanjut dengan `y`, atau set `FORCE_OS=1`. Laporkan hasilnya via Issues agar daftar resmi diperbarui. |
-| Bahasa salah | Jalankan ulang `sudo ./menu.sh` → 17, atau `VPN_LANG=id sudo ./status.sh`, atau `echo id \| sudo tee /etc/vpn/lang`. |
+| Bahasa salah | Jalankan ulang `sudo ./menu.sh` → 17, atau `VPN_LANG=id sudo ./status.sh`, atau `echo id | sudo tee /etc/vpn/lang`. |
 
 ---
 
