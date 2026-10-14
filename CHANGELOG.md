@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.8. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.9. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.8 (Latest - 14 Oktober 2026)](#v48---idempotency--error-handling-script-robustness) — **Idempotency & Error Handling**
+- [v4.9 (Latest - 14 Oktober 2026)](#v49---systemd-service-management--account-output) — **Systemd + Account Summary**
+- [v4.8 (14 Oktober 2026)](#v48---idempotency--error-handling-script-robustness) — **Idempotency & Error Handling**
 - [v4.7 (14 Oktober 2026)](#v47---otomatisasi-ssltls-certificate-acmesh) — **SSL/TLS via acme.sh**
 - [v4.6 (14 Oktober 2026)](#v46---dynamic-firewall-handling) — Dynamic Firewall Handling
 - [v4.5 (14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — Environment Checks + ARM64 Support
@@ -26,6 +27,23 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.8. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.9 — Systemd Service Management & Account Output
+
+**Tanggal**: 14 Oktober 2026
+**Detail**: [changelogs/v4.9.md](changelogs/v4.9.md)
+
+### 🔥 Highlight
+
+**Test-dulu-baru-restart + ringkasan akun tersimpan & QR**
+
+- ✅ **Test-driven restart** — `xray run -test` / `sshd -t` wajib lolos sebelum `systemctl restart` (config rusak tidak menyentuh service berjalan) via `svc_restart_tested`
+- ✅ **Auto-start on boot** — semua unit (`xray`, `wg-quick@wg0`, `ssh-ws`, `stunnel4`, `dropbear`, `shadowsocks`, `openvpn`, `vpn-limits`) via `svc_restart` + kolom `enabled:` di `status.sh`
+- ✅ **Ringkasan tersimpan** — setiap akun dicetak + disimpan ke `/etc/vpn-script/client-config.txt` (mode 600) via `show_and_save`
+- ✅ **QR via qrencode** — PNG + ANSI terminal untuk WireGuard & Xray/SS, tampil ulang via `./show-account.sh [user] --qr` (menu 25)
+- ✅ **Bug fix kritis** — `done` nyasar di `xray_setup_server`, path `/lib/ssl.sh` salah, path OpenVPN salah di `show-account.sh`
 
 ---
 
@@ -375,7 +393,8 @@ Jika OS ID tidak dikenali:
 | v4.5 | 13 | (Environment checks + ARM64 support) ✅ |
 | v4.6 | 13 | (Dynamic firewall handling) ✅ |
 | v4.7 | 13 | (SSL/TLS via acme.sh) 🔒 |
-| **v4.8** | **13** | **(Robustness: strict + portcheck + trap)** 🛡️ | 🔒 | 🔥 |
+| v4.8 | 13 | (Robustness: strict + portcheck + trap) 🛡️ |
+| **v4.9** | **13** | **(Systemd test-restart + account summary + QR)** ⚙️ |
 
 ---
 
@@ -421,4 +440,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.8 (Robustness + SSL + Dynamic Firewall + 13 Protocols)
+**Dibuat oleh wrwb Store** — v4.9 (Systemd test-restart + Account summary + QR + 13 Protocols)

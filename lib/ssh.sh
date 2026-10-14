@@ -82,12 +82,12 @@ EOF
 
   sshd -t || die "$(T "sshd config is invalid after hardening. Check $sshd_conf." "Konfigurasi sshd tidak valid setelah hardening. Cek $sshd_conf." "加固后 sshd 配置无效。请检查 $sshd_conf。")"
 
+  # v4.9: test sshd config BEFORE restart (never restart on broken config),
+  # then enable (auto-start on boot) + restart via helper
   if systemctl list-unit-files | grep -q "^sshd\.service"; then
-    systemctl enable sshd >/dev/null 2>&1 || true
-    systemctl restart sshd
+    svc_restart_tested "sshd" sshd -t
   else
-    systemctl enable ssh >/dev/null 2>&1 || true
-    systemctl restart ssh
+    svc_restart_tested "ssh" sshd -t
   fi
 
   log_success "$(T "OpenSSH server hardened & restarted." "OpenSSH server dikeraskan & dijalankan ulang." "OpenSSH 服务器已加固并重启。")"
@@ -114,8 +114,7 @@ ssh_setup_dropbear() {
     else
       echo 'DROPBEAR_EXTRA_ARGS="-w -s"' >> /etc/default/dropbear
     fi
-    systemctl enable dropbear >/dev/null 2>&1 || true
-    systemctl restart dropbear || true
+    svc_restart "dropbear"
   elif systemctl list-unit-files | grep -q "dropbear"; then
     mkdir -p /etc/systemd/system/dropbear.service.d
     cat > /etc/systemd/system/dropbear.service.d/override.conf <<EOF
@@ -124,8 +123,7 @@ ExecStart=
 ExecStart=/usr/sbin/dropbear -F -E -p $port -w -s
 EOF
     systemctl daemon-reload
-    systemctl enable dropbear >/dev/null 2>&1 || true
-    systemctl restart dropbear || true
+    svc_restart "dropbear"
   fi
 
   open_firewall_port "$port" "tcp" "SSH-Dropbear"
@@ -174,7 +172,7 @@ EOF
 
   cat > /etc/systemd/system/stunnel4.service <<EOF
 [Unit]
-Description=Stunnel TLS Wrapper for SSH
+Description=Stunnel TLS Wrapper for SSH v4.9 (auto-start on boot)
 After=network.target
 
 [Service]
@@ -187,9 +185,8 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-  systemctl daemon-reload
-  systemctl enable stunnel4 >/dev/null 2>&1 || true
-  systemctl restart stunnel4
+  # v4.9: enable (auto-start on boot) + restart via helper
+  svc_restart "stunnel4"
 
   open_firewall_port "$ssl_port" "tcp" "SSH-TLS"
   log_success "$(T "Stunnel active: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel 运行中：端口 $ssl_port（TLS）-> SSH $ssh_port。")"
@@ -280,7 +277,7 @@ EOF
 
   cat > /etc/systemd/system/ssh-ws.service <<EOF
 [Unit]
-Description=SSH over WebSocket Bridge
+Description=SSH over WebSocket Bridge v4.9 (auto-start on boot)
 After=network.target
 
 [Service]
@@ -293,9 +290,8 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-  systemctl daemon-reload
-  systemctl enable ssh-ws >/dev/null 2>&1 || true
-  systemctl restart ssh-ws
+  # v4.9: enable (auto-start on boot) + restart via helper
+  svc_restart "ssh-ws"
 
   open_firewall_port "$ws_port" "tcp" "SSH-WS"
   log_success "$(T "SSH WebSocket bridge is active on port $ws_port." "SSH WebSocket bridge aktif di port $ws_port." "SSH WebSocket 桥接已在端口 $ws_port 运行。")"
@@ -390,6 +386,20 @@ ssh_create_user() {
   SSH_LAST_PASS="$password"
   SSH_LAST_EXPIRE="$expire_date"
   export SSH_LAST_USER SSH_LAST_PASS SSH_LAST_EXPIRE
+
+  # v4.9: print + save the same summary (terminal comfort + re-readable file)
+  # shellcheck disable=SC1090
+  [[ -f "$SSH_PARAMS" ]] && source "$SSH_PARAMS"
+  show_and_save "SSH account: $user" <<EOF
+SSH account  : $user
+Host         : ${SSH_PUB_IP:-?}
+Ports        : SSH ${SSH_PORT:-22} | Dropbear ${DROPBEAR_PORT:-143} | TLS ${SSL_PORT:-444} | WS ${WS_PORT:-8080}
+Username     : $user
+Password     : $password
+Valid until  : $expire_date
+Connect      : ssh -p ${SSH_PORT:-22} $user@${SSH_PUB_IP:-?}
+Re-show      : sudo ./show-account.sh $user | cat $VPN_SUMMARY_FILE
+EOF
 
   log_success "$(T "SSH account '$user' created (valid until $expire_date)." "Akun SSH '$user' dibuat (berlaku s/d $expire_date)." "SSH 账户 '$user' 已创建（有效期至 $expire_date）。")"
 }

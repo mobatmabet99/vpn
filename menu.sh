@@ -73,6 +73,7 @@ EOF
   echo " [12] $(T "Manage SSH accounts (add/remove/list)" "Kelola Akun SSH (tambah/hapus/daftar)" "管理 SSH 账号（添加/删除/列出）")"
   echo " [13] $(T "Manage Xray/V2Ray users (add/remove/list)" "Kelola User Xray/V2Ray (tambah/hapus/daftar)" "管理 Xray/V2Ray 用户（添加/删除/列出）")"
   echo " [14] $(T "Restart all VPN services" "Mulai Ulang Semua Layanan VPN" "重启所有 VPN 服务")"
+  echo " [25] $(T "Show saved account summary (all users / one user + QR)" "Lihat ringkasan akun tersimpan (semua user / satu user + QR)" "查看已保存账号摘要（全部用户 / 单个用户 + 二维码）")"
   echo " [15] $(T "Uninstall / cleanly remove VPN from server" "Uninstall / Hapus Bersih VPN dari Server" "卸载 / 从服务器彻底删除 VPN")"
   echo " [16] $(T "Check IP & bandwidth limits (wrwb Store)" "Cek Limit IP & Bandwidth (wrwb Store)" "检查 IP 与带宽限制 (wrwb Store)")"
   echo " [17] $(T "Switch language (English/Indonesia/中文）" "Ganti bahasa (English/Indonesia/中文）" "切换语言 (英语/印尼语/中文）")"
@@ -88,7 +89,7 @@ EOF
    echo " [24] $(T "Setup SSL Certificate via acme.sh (standalone/DNS)" "Setup Sertifikat SSL via acme.sh (standalone/DNS)" "经 acme.sh 设置 SSL 证书 (standalone/DNS)")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v4.8" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
+  echo " $(T "by wrwb Store v4.9" "Dibuat oleh wrwb Store v4.9" "由 wrwb Store 打造 v4.9")"
 }
 
 pause() {
@@ -147,7 +148,7 @@ menu_switch_language() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "$(T "Choose menu [0-24]: " "Pilih menu [0-24]: " "选择菜单 [0-24]：")" choice
+    read -rp "$(T "Choose menu [0-25]: " "Pilih menu [0-25]: " "选择菜单 [0-25]：")" choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -239,25 +240,45 @@ main_loop() {
         pause
         ;;
       14)
-        log_step "$(T "Restarting WireGuard service..." "Memulai ulang layanan WireGuard..." "正在重启 WireGuard 服务……")"
-        systemctl restart wg-quick@wg0 2>/dev/null && log_success "$(T "WireGuard restarted." "WireGuard dimulai ulang." "WireGuard 已重启。")" || log_warn "$(T "WireGuard is not active." "WireGuard tidak aktif." "WireGuard 未激活。")"
+        log_step "$(T "Restarting all VPN services (config-test first where supported)..." "Memulai ulang semua layanan VPN (uji konfigurasi dulu bila didukung)..." "正在重启所有 VPN 服务（如支持则先测试配置）...")"
+        # v4.9: sshd + xray validated BEFORE restart; the rest via helper
+        if systemctl list-unit-files 2>/dev/null | grep -q "^sshd\.service"; then
+          svc_restart_tested "sshd" sshd -t
+        elif systemctl list-unit-files 2>/dev/null | grep -q "^ssh\.service"; then
+          svc_restart_tested "ssh" sshd -t
+        fi
+        if systemctl list-unit-files 2>/dev/null | grep -q "^xray\.service" && [[ -x /usr/local/bin/xray && -f /etc/xray/config.json ]]; then
+          svc_restart_tested "xray" /usr/local/bin/xray run -test -config /etc/xray/config.json
+        elif systemctl list-unit-files 2>/dev/null | grep -q "^xray\.service"; then
+          svc_restart "xray"
+        fi
+        if systemctl is-active --quiet wg-quick@wg0 2>/dev/null; then
+          if command -v wg-quick &>/dev/null && [[ -f /etc/wireguard/wg0.conf ]]; then
+            wg syncconf wg0 <(wg-quick strip /etc/wireguard/wg0.conf 2>/dev/null) 2>/dev/null || svc_restart "wg-quick@wg0"
+            log_success "$(T "WireGuard reloaded." "WireGuard dimuat ulang." "WireGuard 已重载。")"
+          else
+            svc_restart "wg-quick@wg0"
+          fi
+        else
+          log_warn "$(T "WireGuard is not active." "WireGuard tidak aktif." "WireGuard 未激活。")"
+        fi
         if systemctl list-unit-files | grep -qE "openvpn-server@|openvpn@"; then
-          systemctl restart openvpn-server@server 2>/dev/null || systemctl restart openvpn@server 2>/dev/null || true
-          log_success "$(T "OpenVPN restarted." "OpenVPN dimulai ulang." "OpenVPN 已重启。")"
+          if systemctl list-unit-files | grep -q "openvpn-server@"; then
+            svc_restart "openvpn-server@server"
+          else
+            svc_restart "openvpn@server"
+          fi
         fi
         if systemctl list-unit-files 2>/dev/null | grep -q "shadowsocks-rust"; then
-          systemctl restart shadowsocks-rust 2>/dev/null || true
-          log_success "$(T "Shadowsocks restarted." "Shadowsocks dimulai ulang." "Shadowsocks 已重启。")"
+          svc_restart "shadowsocks-rust"
         fi
-        for svc in ssh dropbear ssh-ws xray; do
+        for svc in dropbear ssh-ws; do
           if systemctl list-unit-files 2>/dev/null | grep -q "^${svc}\\.service"; then
-            systemctl restart "$svc" 2>/dev/null || true
-            log_success "$(T "$svc restarted." "$svc dimulai ulang." "$svc 已重启。")"
+            svc_restart "$svc"
           fi
         done
         if systemctl list-unit-files 2>/dev/null | grep -q "^stunnel4\\.service"; then
-          systemctl restart stunnel4 2>/dev/null || true
-          log_success "$(T "stunnel4 restarted." "stunnel4 dimulai ulang." "stunnel4 已重启。")"
+          svc_restart "stunnel4"
         fi
         pause
         ;;
@@ -299,6 +320,10 @@ main_loop() {
         ;;
       24)
         "$SCRIPT_DIR/setup-ssl.sh"
+        pause
+        ;;
+      25)
+        "$SCRIPT_DIR/show-account.sh"
         pause
         ;;
       0)

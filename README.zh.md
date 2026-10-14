@@ -55,11 +55,12 @@
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
 | 🔒 **自动 SSL (v4.7)** | 经 **acme.sh** 签发 TLS 证书（轻量，无重型 Python 依赖）— **Standalone** 模式（临时端口 80）或 **Cloudflare DNS API**（不怕 CDN/防火墙）。cron 自动续期，存于 `/etc/vpn-ssl/<domain>/`，可用于 Xray TLS / Stunnel / Nginx。菜单 24 / `./setup-ssl.sh`（`install.sh` 默认预安装 acme.sh，经 `--no-ssl` 禁用）|
 | 🛡️ **健壮性 (v4.8)** | 所有脚本 **严格模式**（`set -euo pipefail` + `|| die`），SSH/Xray/OpenVPN/Shadowsocks/Web/SSL **端口冲突检查**（经 `ss`/`lsof` 显示占用者，`/proc/net` 兜底），`EXIT/INT/TERM` trap **自动清理临时文件** — 中途失败不留垃圾。|
+| ⚙️ **Systemd + 摘要 (v4.9)** | **先测试后重启**（`xray run -test` / `sshd -t` 通过后才 `systemctl restart`）+ 所有服务**开机自启** + `status.sh` 显示 `enabled:` 列。每个账号**打印 + 保存**到 `/etc/vpn-script/client-config.txt`（600 权限）+ **qrencode 二维码** — 经 `./show-account.sh [user] --qr` 再次查看（菜单 25）|
 | 🛡️ **自动防火墙** | 检测活动的防火墙后端（**UFW** / **firewalld** / **nftables** / **iptables**），仅在包过滤启用时开放 VPN 端口 — 幂等，无重复规则 |
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |
 | 🔀 **NAT / 伪装** | 通过 WireGuard `PostUp`/`PostDown` 自动添加 `iptables ... -j MASQUERADE`，保证客户端正常上网 |
-| 📦 **模块化** | `install.sh`、`add-client.sh`、`remove-client.sh`、`list-clients.sh`、`show-qr.sh`、`add-ssh-user.sh`、`remove-ssh-user.sh`、`add-xray-user.sh`、`remove-xray-user.sh`、`check-limits.sh`、`status.sh`、`menu.sh` (0-17)、`uninstall.sh`，以及 `lib/` 下的库 (含 `lib/lang.sh`、`lib/limits.sh`) |
+| 📦 **模块化** | `install.sh`、`add-client.sh`、`remove-client.sh`、`list-clients.sh`、`show-qr.sh`、`show-account.sh` (v4.9)、`add-ssh-user.sh`、`remove-ssh-user.sh`、`add-xray-user.sh`、`remove-xray-user.sh`、`check-limits.sh`、`status.sh`、`menu.sh` (0-25)、`uninstall.sh`，以及 `lib/` 下的库 (含 `lib/lang.sh`、`lib/limits.sh`) |
 | 🌐 **三语 (v1.4)** | 默认英文，另有印尼语、中文可选。单代码库通过 `lib/lang.sh` 的 `T "English" "Indonesia" "中文"` 实现，选择保存在 `/etc/vpn/lang` |
 | ⚠️ **错误处理** | 必须 root/sudo，检查 `/dev/net/tun`，系统检测 + 未测试发行版警告，端口与依赖检查，客户端/用户名校验，旧配置备份 |
 | ⏱️ **限制与暂停 (v1.2)** | 每个账号并发 IP + 每月带宽 GB 限制 (默认 2 IP & 100 GB)。多登录超限 = 自动暂停 5 分钟 + 自动清理会话。`vpn-limits` systemd 监控每 60 秒检查一次 |

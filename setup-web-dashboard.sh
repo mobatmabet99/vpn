@@ -121,9 +121,8 @@ log_info "Opening firewall port $WEB_PORT..."
 open_firewall_port "$WEB_PORT" "tcp" "Web-Dashboard"
 
 # Enable and start service
-systemctl daemon-reload
-systemctl enable vpn-web-dashboard
-systemctl start vpn-web-dashboard
+# v4.9: enable (auto-start on boot) + start via helper
+svc_restart "vpn-web-dashboard"
 
 # Get server IP
 SERVER_IP=$(get_public_ip)

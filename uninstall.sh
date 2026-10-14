@@ -15,7 +15,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
 source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
-source "/lib/ssl.sh"
+source "$SCRIPT_DIR/lib/ssl.sh"
 
 install_cleanup_trap
 need_root
@@ -132,6 +132,13 @@ fi
 # 8b. Remove the saved language preference
 rm -f /etc/vpn/lang 2>/dev/null || true
 rmdir /etc/vpn 2>/dev/null || true
+
+# 8c. Remove the saved account summary (v4.9, contains secrets)
+if [[ -f /etc/vpn-script/client-config.txt || -d /etc/vpn-script ]]; then
+  log_step "$(T "Cleaning up the saved account summary..." "Membersihkan ringkasan akun tersimpan..." "正在清理已保存账户摘要...")"
+  rm -rf /etc/vpn-script
+  log_success "$(T "Saved account summary removed." "Ringkasan akun tersimpan dihapus." "已保存账户摘要已删除。")"
+fi
 
 # 9. Stop & clean the limit monitor (wrwb Store)
 if systemctl list-unit-files 2>/dev/null | grep -q "^vpn-limits\\.service"; then

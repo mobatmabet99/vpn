@@ -97,7 +97,7 @@ EOF
   # Buat systemd service unit
   cat > /etc/systemd/system/shadowsocks-rust.service <<EOF
 [Unit]
-Description=Shadowsocks-rust Server Service
+Description=Shadowsocks-rust Server Service v4.9 (auto-start on boot)
 After=network.target
 
 [Service]
@@ -112,9 +112,8 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
-  systemctl daemon-reload
-  systemctl enable shadowsocks-rust.service
-  systemctl restart shadowsocks-rust.service
+  # v4.9: enable (auto-start on boot) + restart via helper
+  svc_restart "shadowsocks-rust.service"
 
   # Open TCP & UDP in the firewall
   open_firewall_port "$port" "tcp" "Shadowsocks"
@@ -135,6 +134,17 @@ EOF
   local userinfo
   userinfo="$(echo -n "${method}:${password}" | base64 -w 0 2>/dev/null || echo -n "${method}:${password}" | base64)"
   local ss_uri="ss://${userinfo}@${pub_ip}:${port}#VPN-Shadowsocks"
+
+  # v4.9: print + save the same summary (terminal comfort + re-readable file)
+  show_and_save "Shadowsocks server" <<EOF
+Shadowsocks server
+Host     : $pub_ip
+Port     : $port (TCP+UDP)
+Method   : $method
+Password : $password
+URI      : $ss_uri
+Re-show  : cat $VPN_SUMMARY_FILE
+EOF
 
   echo ""
   echo "==================== SHADOWSOCKS CONNECTION ===================="

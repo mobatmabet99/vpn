@@ -419,13 +419,15 @@ EOF
 EOF
   chmod 600 "$XRAY_CONFIG"
 
-  # Validate the config before starting
-  "$XRAY_BIN" run -test -config "$XRAY_CONFIG" 2>&1 | tail -n5 || true
+  # v4.9: validate config BEFORE restart (never restart on broken config)
+  log_step "$(T "Validating the Xray config (run -test) before starting..." "Memvalidasi konfigurasi Xray (run -test) sebelum dijalankan..." "正在启动前验证 Xray 配置 (run -test)...")"
+  "$XRAY_BIN" run -test -config "$XRAY_CONFIG" 2>&1 | tail -n5 ||
+    die "$(T "Xray config test FAILED — aborting before restart." "Tes konfigurasi Xray GAGAL — dibatalkan sebelum restart." "Xray 配置测试失败 — 已在重启前中止。")"
 
   # Systemd service
   cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
-Description=Xray/V2Ray Service v4.2 (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY)
+Description=Xray/V2Ray Service v4.9 (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY, auto-start on boot)
 After=network.target
 
 [Service]
@@ -440,35 +442,30 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
-  systemctl daemon-reload
-  systemctl enable xray >/dev/null 2>&1 || true
-  systemctl restart xray
-
-  if ! systemctl is-active --quiet xray; then
-    log_error "$(T "The xray service failed to start. Log:" "Service xray gagal berjalan. Log:" "xray 服务启动失败。日志：")"
-    journalctl -u xray -n 20 --no-pager || true
+  svc_restart "$XRAY_SERVICE"
+  systemctl is-active --quiet xray ||
     die "$(T "${XRAY_ENGINE} install failed to start." "Instalasi ${XRAY_ENGINE} gagal dijalankan." "${XRAY_ENGINE} 安装后启动失败。")"
-  fi
 
   # Open every inbound port in the firewall (WebSocket + gRPC + XHTTP)
   open_firewall_ports "Xray" "tcp" "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC" "$XPORT_XHTTP_SHARED"
-  done
 
   # Register the default server account
   touch "$XRAY_ACCOUNTS_DB"
   chmod 600 "$XRAY_ACCOUNTS_DB"
   echo "server-default:${server_uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
-  log_success "$(T "${XRAY_ENGINE} v4.2 is active (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.2 aktif (13 inbound: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.2 运行中（13 个入站：WS + gRPC + XHTTP + XTLS + REALITY）。")"
+  log_success "$(T "${XRAY_ENGINE} v4.9 is active (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.9 aktif (13 inbound: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.9 运行中（13 个入站：WS + gRPC + XHTTP + XTLS + REALITY）。")"
 
   xray_print_links "server-default" "$server_uuid"
 }
 
 # ------------------------------------------------------- link generator
 # Prints vmess://, vless:// and trojan:// links (WS + gRPC + XHTTP) + QR for 1 UUID — v4.2
+# v4.9: SAVE=1 also appends the full block to $VPN_SUMMARY_FILE (re-readable).
 xray_print_links() {
   local name="${1:?$(T "username is required" "nama user wajib diisi" "用户名为必需")}"
   local uuid="${2:?$(T "uuid is required" "uuid wajib diisi" "uuid 为必需")}"
+  local save="${3:-1}"
   # shellcheck disable=SC1090
   [[ -f "$XRAY_PARAMS" ]] && source "$XRAY_PARAMS"
 
@@ -512,7 +509,7 @@ xray_print_links() {
   local vless_reality_xhttp_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY_XHTTP}?encryption=none&security=reality&type=xhttp&path=%2Freality-xhttp&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}#${name}-vless-reality-xhttp"
 
   echo ""
-  echo "==================== $(T "CONNECTION LINKS v4.2 (13 PROTOCOLS)" "LINK KONEKSI v4.2 (13 PROTOKOL)" "连接链接 v4.2（13 种协议）"): $name ===================="
+  echo "==================== $(T "CONNECTION LINKS v4.9 (13 PROTOCOLS)" "LINK KONEKSI v4.9 (13 PROTOKOL)" "连接链接 v4.9（13 种协议）"): $name ===================="
   echo ""
   echo "$(T "=== RECOMMENDED (Top 4) ===" "=== REKOMENDASI (4 Teratas) ===" "=== 推荐（前 4 名）===")"
   echo ""
@@ -573,6 +570,31 @@ xray_print_links() {
   XRAY_LAST_REALITY_GRPC="$vless_reality_grpc_link"
   XRAY_LAST_REALITY_XHTTP="$vless_reality_xhttp_link"
   export XRAY_LAST_VMESS XRAY_LAST_REALITY XRAY_LAST_REALITY_GRPC XRAY_LAST_REALITY_XHTTP
+
+  # v4.9: save the same block to the re-readable summary file (default ON;
+  # pass SAVE=0 as $3 for display-only, e.g. from show-account.sh)
+  if [[ "$save" == "1" ]]; then
+    summary_block "Xray user: $name" <<EOF
+Xray user : $name
+UUID      : $uuid
+Server IP : $ip
+SNI       : $sni
+[1 BEST] VLESS XHTTP REALITY 443: $vless_reality_xhttp_link
+[2] VLESS TCP REALITY 443: $vless_reality_link
+[3] VLESS gRPC REALITY: $vless_reality_grpc_link
+[4] VLESS XTLS 10004: $vless_xtls_link
+[5] VMess XHTTP 80: $vmess_xhttp_link
+[6] VLESS XHTTP 80: $vless_xhttp_link
+[7] Trojan XHTTP 80: $trojan_xhttp_link
+[8] VMess WS: $vmess_link
+[9] VLESS WS: $vless_ws_link
+[10] Trojan WS: $trojan_link
+[11] VMess gRPC: $vmess_grpc_link
+[12] VLESS gRPC: $vless_grpc_link
+[13] Trojan gRPC: $trojan_grpc_link
+Re-show: sudo ./show-account.sh $name [--qr] | cat $VPN_SUMMARY_FILE
+EOF
+  fi
 }
 
 # ------------------------------------------------------- user management
@@ -640,10 +662,8 @@ PYEOF
   rm -f "$tmp"
   chmod 600 "$XRAY_CONFIG"
 
-  # Validate & reload the service
-  "$XRAY_BIN" run -test -config "$XRAY_CONFIG" || die "$(T "The new Xray config is invalid, aborting." "Konfigurasi Xray baru tidak valid, dibatalkan." "新的 Xray 配置无效，已中止。")"
-  systemctl restart xray
-  systemctl is-active --quiet xray || die "$(T "The xray service failed to restart after adding the user." "Service xray gagal restart setelah tambah user." "添加用户后 xray 服务重启失败。")"
+  # v4.9: validate BEFORE restart — broken config never touches the running service
+  svc_restart_tested "xray" "$XRAY_BIN" run -test -config "$XRAY_CONFIG"
 
   echo "${name}:${uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
@@ -690,7 +710,8 @@ PYEOF
   chmod 600 "$XRAY_CONFIG"
 
   sed -i "/^${name}:/d" "$XRAY_ACCOUNTS_DB"
-  systemctl restart xray || true
+  # v4.9: validate BEFORE restart — broken config never touches the running service
+  svc_restart_tested "xray" "$XRAY_BIN" run -test -config "$XRAY_CONFIG"
 
   log_success "$(T "Xray user '$name' removed from all inbounds." "User Xray '$name' berhasil dihapus dari semua inbound." "Xray 用户 '$name' 已从所有入站中删除。")"
 }

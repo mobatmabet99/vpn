@@ -97,9 +97,8 @@ WantedBy=multi-user.target
 EOF
 
 # Enable and start service
-systemctl daemon-reload
-systemctl enable vpn-telegram-bot
-systemctl start vpn-telegram-bot
+# v4.9: enable (auto-start on boot) + start via helper
+svc_restart "vpn-telegram-bot"
 
 log_success "Telegram bot installed and started!"
 echo ""

@@ -331,7 +331,7 @@ main() {
   fi
 
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    log_step "$(T "Installing ${XRAY_ENGINE} v4.2 server (13 inbounds: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4.2 Server (13 inbound: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4.2 服务器 (13 个入站: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)……")"
+    log_step "$(T "Installing ${XRAY_ENGINE} v4.9 server (13 inbounds: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4.9 Server (13 inbound: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4.9 服务器 (13 个入站: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)……")"
     xray_setup_server "$SERVER_PUB_IP"
   fi
 
@@ -375,6 +375,7 @@ main() {
   echo "  - $(T "Remove user     : sudo ./remove-client.sh <client_name>" "Hapus user       : sudo ./remove-client.sh <nama_client>" "删除用户：sudo ./remove-client.sh <client_name>")"
   echo "  - $(T "List clients    : sudo ./list-clients.sh" "Daftar client    : sudo ./list-clients.sh" "列出客户端：sudo ./list-clients.sh")"
   echo "  - $(T "Check status    : sudo ./status.sh" "Cek status       : sudo ./status.sh" "检查状态：sudo ./status.sh")"
+  echo "  - $(T "Show saved acct : sudo ./show-account.sh [user] [--qr] | cat /etc/vpn-script/client-config.txt" "Lihat akun tersimpan: sudo ./show-account.sh [user] [--qr] | cat /etc/vpn-script/client-config.txt" "查看已存账号：sudo ./show-account.sh [user] [--qr] | cat /etc/vpn-script/client-config.txt")"
   echo "  - $(T "Interactive menu: sudo ./menu.sh" "Menu interaktif  : sudo ./menu.sh" "交互式菜单：sudo ./menu.sh")"
   echo "  - $(T "SSL certificate : sudo ./setup-ssl.sh (menu 24, acme.sh pre-installed)" "Sertifikat SSL    : sudo ./setup-ssl.sh (menu 24, acme.sh sudah terinstal)" "SSL 证书：sudo ./setup-ssl.sh（菜单 24，acme.sh 已预安装）")"
   echo "  - $(T "SSL status      : sudo ./setup-ssl.sh --status" "Status SSL        : sudo ./setup-ssl.sh --status" "SSL 状态：sudo ./setup-ssl.sh --status")"
@@ -382,7 +383,7 @@ main() {
     echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "SSH 账号：sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    echo "  - $(T "Xray/V2Ray v4.2 users (13 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4.2 (13 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4.2 用户（13 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    echo "  - $(T "Xray/V2Ray v4.9 users (13 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4.9 (13 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4.9 用户（13 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
   fi
   echo ""
 }

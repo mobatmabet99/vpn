@@ -15,7 +15,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
 source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
-source "/lib/ssl.sh"
+source "$SCRIPT_DIR/lib/ssl.sh"
 
 need_root
 detect_os
@@ -59,13 +59,13 @@ fi
 echo "--------------------------------------------------------------------------------"
 echo -e "${_C_BOLD}$(T "WIREGUARD SERVICE:" "LAYANAN WIREGUARD:" "WIREGUARD 服务：")${_C_RESET}"
 if systemctl is-active --quiet wg-quick@wg0 2>/dev/null; then
-  echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET}"
+  echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET} ($(T "enabled: $(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?') — auto-start on boot" "enabled: $(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?') — auto-start saat boot" "enabled：$(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?') — 开机自启"))"
   if command -v wg &>/dev/null; then
     echo "$(T "Interface details (wg show wg0):" "Detail Antarmuka (wg show wg0):" "接口详情 (wg show wg0)：")"
     wg show wg0 2>/dev/null || true
   fi
 else
-  echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_RED}[INACTIVE / STOPPED]${_C_RESET}"
+  echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_RED}[INACTIVE / STOPPED]${_C_RESET} ($(T "enabled: $(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?')" "enabled: $(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?')" "enabled：$(systemctl is-enabled wg-quick@wg0 2>/dev/null || echo '?')"))"
 fi
 
 # 4. Optional services (OpenVPN & Shadowsocks)
@@ -77,6 +77,11 @@ if systemctl list-unit-files | grep -qE "openvpn-server@|openvpn@"; then
   else
     echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_YELLOW}[INACTIVE]${_C_RESET}"
   fi
+  if systemctl is-enabled --quiet openvpn-server@server 2>/dev/null || systemctl is-enabled --quiet openvpn@server 2>/dev/null; then
+    echo -e "$(T "Auto-start on boot    : " "Auto-start saat boot  : " "开机自启              : ")${_C_GREEN}[ENABLED]${_C_RESET}"
+  else
+    echo -e "$(T "Auto-start on boot    : " "Auto-start saat boot  : " "开机自启              : ")${_C_YELLOW}[DISABLED]${_C_RESET}"
+  fi
 fi
 
 if systemctl list-unit-files 2>/dev/null | grep -q "shadowsocks-rust"; then
@@ -87,6 +92,11 @@ if systemctl list-unit-files 2>/dev/null | grep -q "shadowsocks-rust"; then
   else
     echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_YELLOW}[INACTIVE]${_C_RESET}"
   fi
+  if systemctl is-enabled --quiet shadowsocks-rust 2>/dev/null; then
+    echo -e "$(T "Auto-start on boot    : " "Auto-start saat boot  : " "开机自启              : ")${_C_GREEN}[ENABLED]${_C_RESET}"
+  else
+    echo -e "$(T "Auto-start on boot    : " "Auto-start saat boot  : " "开机自启              : ")${_C_YELLOW}[DISABLED]${_C_RESET}"
+  fi
 fi
 
 # 4b. SSH VPN service status (OpenSSH / Dropbear / Stunnel / WebSocket)
@@ -95,10 +105,11 @@ if [[ -f /etc/ssh-vpn/params ]] || systemctl list-unit-files 2>/dev/null | grep 
   echo -e "${_C_BOLD}$(T "SSH VPN SERVICE:" "LAYANAN SSH VPN:" "SSH VPN 服务：")${_C_RESET}"
   for svc in ssh sshd dropbear stunnel4 ssh-ws; do
     if systemctl list-unit-files 2>/dev/null | grep -q "^${svc}\\.service"; then
+      _en="$(systemctl is-enabled "$svc" 2>/dev/null || echo '?')"
       if systemctl is-active --quiet "$svc" 2>/dev/null; then
-        echo -e "  ${svc} : ${_C_GREEN}[ACTIVE]${_C_RESET}"
+        echo -e "  ${svc} : ${_C_GREEN}[ACTIVE]${_C_RESET} (enabled: $_en)"
       else
-        echo -e "  ${svc} : ${_C_YELLOW}[INACTIVE]${_C_RESET}"
+        echo -e "  ${svc} : ${_C_YELLOW}[INACTIVE]${_C_RESET} (enabled: $_en)"
       fi
     fi
   done
@@ -109,8 +120,9 @@ if [[ -f /etc/xray/params ]] || systemctl list-unit-files 2>/dev/null | grep -q 
   echo "--------------------------------------------------------------------------------"
   echo -e "${_C_BOLD}$(T "XRAY/V2RAY SERVICE:" "LAYANAN XRAY/V2RAY:" "XRAY/V2RAY 服务：")${_C_RESET}"
   if systemctl is-active --quiet xray 2>/dev/null; then
-    echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET}"
+    echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET} ($(T "enabled: $(systemctl is-enabled xray 2>/dev/null || echo '?') — auto-start on boot" "enabled: $(systemctl is-enabled xray 2>/dev/null || echo '?') — auto-start saat boot" "enabled：$(systemctl is-enabled xray 2>/dev/null || echo '?') — 开机自启"))"
     if [[ -x /usr/local/bin/xray ]]; then
+      echo -e "$(T "Config test           : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'FAIL')" "Tes konfigurasi       : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'GAGAL')" "配置测试              : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo '失败')")"
       echo -e "$(T "Binary version        : $(/usr/local/bin/xray version 2>/dev/null | head -n1)" "Versi Binary          : $(/usr/local/bin/xray version 2>/dev/null | head -n1)" "程序版本              : $(/usr/local/bin/xray version 2>/dev/null | head -n1)")"
     fi
     if [[ -f /etc/xray/params ]]; then
@@ -194,6 +206,16 @@ if [[ -x /root/.acme.sh/acme.sh ]]; then
   fi
 else
   echo -e "$(T "acme.sh               : " "acme.sh               : " "acme.sh               : ")${_C_YELLOW}[NOT INSTALLED]${_C_RESET} ($(T "run menu 24 or ./setup-ssl.sh" "jalankan menu 24 atau ./setup-ssl.sh" "请运行菜单 24 或 ./setup-ssl.sh"))"
+fi
+
+# 8. Saved account summary (v4.9)
+echo "--------------------------------------------------------------------------------"
+echo -e "${_C_BOLD}$(T "SAVED ACCOUNT SUMMARY (v4.9):" "RINGKASAN AKUN TERSIMPAN (v4.9):" "已保存账户摘要 (v4.9)：")${_C_RESET}"
+if [[ -f /etc/vpn-script/client-config.txt ]]; then
+  echo "$(T "File                  : /etc/vpn-script/client-config.txt ($(wc -l < /etc/vpn-script/client-config.txt) lines, $(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1))" "File                  : /etc/vpn-script/client-config.txt ($(wc -l < /etc/vpn-script/client-config.txt) baris, $(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1))" "文件                  ：/etc/vpn-script/client-config.txt（$(wc -l < /etc/vpn-script/client-config.txt) 行，$(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1)）")"
+  echo "$(T "Re-show               : sudo ./show-account.sh [user] [--qr] (menu 25)" "Lihat lagi            : sudo ./show-account.sh [user] [--qr] (menu 25)" "再次查看              ：sudo ./show-account.sh [user] [--qr]（菜单 25）")"
+else
+  echo -e "$(T "Summary file          : " "File ringkasan        : " "摘要文件              : ")${_C_YELLOW}[$(T "NOT CREATED YET — new accounts save automatically" "BELUM DIBUAT — akun baru otomatis tersimpan" "尚未创建 — 新账户将自动保存")]${_C_RESET}"
 fi
 
 echo "================================================================================"

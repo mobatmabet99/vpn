@@ -55,11 +55,12 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
 | 🔒 **SSL otomatis (v4.7)** | Sertifikat TLS via **acme.sh** (ringan, tanpa Python berat) — mode **Standalone** (port 80 sementara) atau **DNS API Cloudflare** (tahan CDN/firewall). Auto-renew via cron, tersimpan di `/etc/vpn-ssl/<domain>/` untuk Xray TLS / Stunnel / Nginx. acme.sh **pre-instal default** saat `install.sh` (nonaktifkan via `--no-ssl`) — terbitkan sertifikat via Menu 24 / `./setup-ssl.sh` |
 | 🛡️ **Robustness (v4.8)** | **Strict mode** (`set -euo pipefail` + `|| die`) di semua script, **cek port bentrok** (tampilkan pemilik proses via `ss`/`lsof`, fallback `/proc/net`) untuk SSH/Xray/OpenVPN/Shadowsocks/Web/SSL, dan **auto-cleanup temp** via trap `EXIT/INT/TERM` — gagal tengah jalan tidak tinggalkan sampah. |
+| ⚙️ **Systemd + ringkasan (v4.9)** | **Test-dulu-baru-restart** (`xray run -test` / `sshd -t` wajib lolos sebelum `systemctl restart`) + **auto-start on boot** semua service + kolom `enabled:` di `status.sh`. Setiap akun **dicetak + disimpan** ke `/etc/vpn-script/client-config.txt` (mode 600) + **QR via qrencode** — tampil ulang via `./show-account.sh [user] --qr` (menu 25) |
 | 🛡️ **Firewall otomatis** | Mendeteksi backend firewall aktif (**UFW** / **firewalld** / **nftables** / **iptables**) dan membuka port VPN hanya bila filtering aktif — idempotent, tanpa aturan duplikat |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
-| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-17), `uninstall.sh`, plus library di `lib/` (termasuk `lib/lang.sh`, `lib/limits.sh`) |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `show-account.sh` (v4.9), `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-25), `uninstall.sh`, plus library di `lib/` (termasuk `lib/lang.sh`, `lib/limits.sh`) |
 | 🌐 **Trilingual (v1.4)** | English default, Indonesia + Mandarin opsional. Satu codebase via `T "English" "Indonesia" "中文"` di `lib/lang.sh`, tersimpan di `/etc/vpn/lang` |
 | ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client/user, backup konfigurasi lama |
 | ⏱️ **Limit & suspend (v1.2)** | Limit IP concurrent + bandwidth GB/bulan per akun (default 2 IP & 100 GB). Multi-login > limit = auto-suspend 5 menit + auto-clear sesi. Monitor systemd `vpn-limits` tiap 60 detik |
@@ -75,14 +76,15 @@ vpn/
 ├── remove-client.sh        # Hapus client WireGuard (+ bersihkan data limit)
 ├── list-clients.sh         # Daftar client WG + statistik trafik & handshake
 ├── show-qr.sh              # Tampilkan ulang QR Code / .conf client WG
+├── show-account.sh         # (v4.9) Tampilkan ulang ringkasan tersimpan (semua user / 1 user + --qr)
 ├── add-ssh-user.sh         # Buat akun SSH VPN (masa berlaku + limit IP & bandwidth)
 ├── remove-ssh-user.sh      # Hapus akun SSH VPN (+ bersihkan data limit)
 ├── add-xray-user.sh        # Buat user Xray/V2Ray + limit IP & bandwidth
 ├── remove-xray-user.sh     # Hapus user Xray/V2Ray (+ bersihkan data limit)
 ├── check-limits.sh         # Lihat limit IP, kuota, IP aktif & status suspend
-├── status.sh               # Diagnostik: service, forwarding, TUN, NAT, firewall, limit, bahasa
-├── menu.sh                 # Menu interaktif 0-17 (panel kontrol wrwb Store, termasuk ganti bahasa)
-├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit, + /etc/vpn/lang)
+├── status.sh               # Diagnostik: service (+enabled/auto-start), forwarding, TUN, NAT, firewall, limit, SSL, ringkasan tersimpan
+├── menu.sh                 # Menu interaktif 0-25 (panel kontrol wrwb Store, termasuk ganti bahasa + show-account)
+├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit, + /etc/vpn/lang, + /etc/vpn-script)
 ├── README.md               # Dokumentasi Indonesia (file ini)
 ├── README.en.md            # Dokumentasi English (default)
 ├── README.zh.md            # Dokumentasi Mandarin (简体中文)

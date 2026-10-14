@@ -530,7 +530,8 @@ SERVICE_EOF
 
   systemctl daemon-reload 2>/dev/null || true
   systemctl enable vpn-limits.service >/dev/null 2>&1 || true
-  systemctl restart vpn-limits.service 2>/dev/null || true
+  # v4.9: enable (auto-start on boot) + restart via helper
+  svc_restart "vpn-limits.service" 2>/dev/null || systemctl restart vpn-limits.service 2>/dev/null || true
 
   if declare -f log_success &>/dev/null; then
     log_success "$(T "Limit monitor service is active (checks every 60 seconds) — wrwb Store." "Layanan monitor limit aktif (cek setiap 60 detik) — wrwb Store." "限制监控服务运行中（每 60 秒检查一次）——由 wrwb Store 打造。")"

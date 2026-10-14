@@ -148,13 +148,10 @@ EOF
   # Enable the service
   log_step "$(T "Enabling the OpenVPN service..." "Mengaktifkan service OpenVPN..." "正在启用 OpenVPN 服务...")"
   if systemctl list-unit-files | grep -q "openvpn-server@"; then
-    systemctl daemon-reload
-    systemctl enable openvpn-server@server.service
-    systemctl restart openvpn-server@server.service
+    # v4.9: enable (auto-start on boot) + restart via helper
+    svc_restart "openvpn-server@server.service"
   else
-    systemctl daemon-reload
-    systemctl enable openvpn@server.service
-    systemctl restart openvpn@server.service
+    svc_restart "openvpn@server.service"
   fi
 
   # Open the firewall
@@ -218,6 +215,21 @@ EOF
 
   log_success "$(T "OpenVPN client '$name' created at: $client_conf" "Client OpenVPN '$name' berhasil dibuat di: $client_conf" "OpenVPN 客户端 '$name' 已创建于：$client_conf")"
   LAST_OVPN_CONF="$client_conf"
+  export LAST_OVPN_CONF
+
+  # v4.9: print + save the same summary (terminal comfort + re-readable file)
+  echo ""
+  echo "==================== OpenVPN client: $name ===================="
+  echo "$(T "Profile : $client_conf" "Profil  : $client_conf" "配置文件：$client_conf")"
+  echo "$(T "Server  : $OVPN_PUB_IP:$OVPN_PORT/$OVPN_PROTO" "Server  : $OVPN_PUB_IP:$OVPN_PORT/$OVPN_PROTO" "服务器：$OVPN_PUB_IP:$OVPN_PORT/$OVPN_PROTO")"
+  echo "$(T "Re-show : sudo ./show-account.sh $name | cat $VPN_SUMMARY_FILE" "Lihat lagi: sudo ./show-account.sh $name | cat $VPN_SUMMARY_FILE" "再次查看：sudo ./show-account.sh $name | cat $VPN_SUMMARY_FILE")"
+  echo "=============================================================="
+  summary_block "OpenVPN client: $name" <<EOF
+OpenVPN client : $name
+Profile        : $client_conf
+Server         : $OVPN_PUB_IP:$OVPN_PORT/$OVPN_PROTO
+Re-show anytime: sudo ./show-account.sh $name | cat $VPN_SUMMARY_FILE
+EOF
 }
 
 ovpn_remove_client() {

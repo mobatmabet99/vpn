@@ -567,6 +567,88 @@ vpn_cleanup_tracked() {
   done
   VPN_TMP_TRACKED=""
 }
+# ------------------------------------------------------- v4.9: systemd helpers
+# Test-driven service restart: validate config first, only then restart.
+# Usage: svc_restart_tested <unit> <test_cmd...>  (test_cmd e.g. xray run -test -config f)
+# Returns 0 on active service, dies with journal tail otherwise.
+svc_restart_tested() {
+  local unit="$1"; shift
+  if [[ $# -gt 0 ]]; then
+    log_step "$(T "Validating $unit config before restart..." "Memvalidasi konfigurasi $unit sebelum restart..." "正在重启前验证 $unit 配置...")"
+    if ! "$@" 2>&1 | tail -n5; then
+      die "$(T "$unit config test FAILED — restart aborted, service left running." "Tes konfigurasi $unit GAGAL — restart dibatalkan, service tetap berjalan." "$unit 配置测试失败 — 已中止重启，服务保持运行。")"
+    fi
+  fi
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl enable "$unit" >/dev/null 2>&1 || true
+  systemctl restart "$unit"
+  if systemctl is-active --quiet "$unit"; then
+    log_success "$(T "$unit is active." "$unit aktif." "$unit 运行中。")"
+    return 0
+  fi
+  log_error "$(T "$unit failed to start. Log:" "$unit gagal berjalan. Log:" "$unit 启动失败。日志：")"
+  journalctl -u "$unit" -n 20 --no-pager || true
+  die "$(T "$unit failed to start." "$unit gagal dijalankan." "$unit 启动失败。")"
+}
+
+# Lightweight restart for services without a config-test binary (ssserver, ssh-ws, stunnel).
+# Usage: svc_restart <unit>
+svc_restart() {
+  local unit="$1"
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl enable "$unit" >/dev/null 2>&1 || true
+  systemctl restart "$unit" || true
+  if systemctl is-active --quiet "$unit"; then
+    log_success "$(T "$unit is active." "$unit aktif." "$unit 运行中。")"
+  else
+    log_warn "$(T "$unit is not active — check journalctl -u $unit" "$unit tidak aktif — cek journalctl -u $unit" "$unit 未运行 — 请检查 journalctl -u $unit")"
+  fi
+}
+
+# ------------------------------------------------------- v4.9: account summary
+# Central account-summary file, re-readable anytime (user request v4.9).
+VPN_SUMMARY_DIR="/etc/vpn-script"
+VPN_SUMMARY_FILE="$VPN_SUMMARY_DIR/client-config.txt"
+
+summary_init() {
+  mkdir -p "$VPN_SUMMARY_DIR"
+  chmod 700 "$VPN_SUMMARY_DIR"
+  if [[ ! -f "$VPN_SUMMARY_FILE" ]]; then
+    {
+      echo "# VPN Account Summary — wrwb Store (generated $(date +%Y-%m-%d))"
+      echo "# Re-readable anytime: cat $VPN_SUMMARY_FILE"
+      echo "# WARNING: contains secrets (UUID/passwords). Keep mode 600."
+      echo ""
+    } > "$VPN_SUMMARY_FILE"
+    chmod 600 "$VPN_SUMMARY_FILE"
+  fi
+}
+
+# Append one titled block to the summary file.
+# Usage: summary_block "TITLE" <<text ... text
+summary_block() {
+  local title="$1"
+  summary_init
+  {
+    echo "======================================================================"
+    echo "# $title — $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "======================================================================"
+    cat
+    echo ""
+  } >> "$VPN_SUMMARY_FILE"
+  chmod 600 "$VPN_SUMMARY_FILE"
+}
+
+# Print + save the SAME text (terminal comfort + file record, user request v4.9).
+# Usage: show_and_save "TITLE" <<text ... text
+show_and_save() {
+  local title="$1"
+  local body
+  body="$(cat)"
+  echo "$body"
+  summary_block "$title" <<<"$body"
+}
+
 gen_password() {
   local len="${1:-16}"
   if command -v openssl &>/dev/null; then

@@ -78,17 +78,15 @@ EOF
 # ----------------------------------------------------------- Systemd Service
 wg_enable_and_start() {
   log_step "$(T "Enabling and starting WireGuard (wg-quick@wg0)..." "Mengaktifkan dan menjalankan layanan WireGuard (wg-quick@wg0)..." "正在启用并启动 WireGuard 服务（wg-quick@wg0）...")"
-  systemctl daemon-reload 2>/dev/null || true
-  systemctl enable wg-quick@wg0 >/dev/null 2>&1 || true
-  systemctl restart wg-quick@wg0
+  # v4.9: enable (auto-start on boot) + restart via helper, fatal on failure
+  svc_restart "wg-quick@wg0"
 
-  if systemctl is-active --quiet wg-quick@wg0; then
-    log_success "$(T "wg-quick@wg0 is active and running normally." "Layanan wg-quick@wg0 aktif dan berjalan normal." "wg-quick@wg0 服务运行中，一切正常。")"
-  else
+  systemctl is-active --quiet wg-quick@wg0 || {
     log_error "$(T "wg-quick@wg0 failed to start. Systemd log:" "Layanan wg-quick@wg0 gagal berjalan. Log systemd:" "wg-quick@wg0 启动失败。Systemd 日志：")"
     journalctl -u wg-quick@wg0 -n 20 --no-pager || true
     die "$(T "WireGuard failed to start." "Instalasi WireGuard gagal dijalankan." "WireGuard 启动失败。")"
-  fi
+  }
+  log_success "$(T "wg-quick@wg0 is active and running normally." "Layanan wg-quick@wg0 aktif dan berjalan normal." "wg-quick@wg0 服务运行中，一切正常。")"
 }
 
 wg_reload_config() {
@@ -96,10 +94,11 @@ wg_reload_config() {
     # Muat ulang tanpa memutus koneksi (strip FILE konfigurasi, bukan nama interface)
     if command -v wg-quick &>/dev/null; then
       wg syncconf wg0 <(wg-quick strip "$WG_CONF" 2>/dev/null) 2>/dev/null || {
-        systemctl restart wg-quick@wg0
+        # v4.9: fallback restart via helper (re-enables auto-start too)
+        svc_restart "wg-quick@wg0"
       }
     else
-      systemctl restart wg-quick@wg0
+      svc_restart "wg-quick@wg0"
     fi
   fi
 }
@@ -234,6 +233,22 @@ EOF
   LAST_CLIENT_CONF="$conf_file"
   LAST_CLIENT_PNG="$png_file"
   export LAST_CLIENT_CONF LAST_CLIENT_PNG
+
+  # v4.9: print + save the same summary (terminal comfort + re-readable file)
+  show_and_save "WireGuard client: $name" <<EOF
+WireGuard client : $name
+Endpoint         : $endpoint
+Config file      : $conf_file
+QR PNG           : ${png_file} (when qrencode available)
+DNS              : $dns_list
+Address          : ${CLIENT_IPV4}/32, ${CLIENT_IPV6}/128
+Re-show anytime  : sudo ./show-account.sh $name [--qr] | cat $VPN_SUMMARY_FILE
+------ $conf_file ------
+$(cat "$conf_file")
+EOF
+
+  # Render QR to terminal (user request v4.9: QR via qrencode)
+  wg_show_client_qr "$conf_file" || true
 }
 
 wg_show_client_qr() {
