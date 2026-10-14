@@ -75,20 +75,52 @@ EOF
   echo " [16] $(T "Check IP & bandwidth limits (wrwb Store)" "Cek Limit IP & Bandwidth (wrwb Store)" "检查 IP 与带宽限制 (wrwb Store)")"
   echo " [17] $(T "Switch language (English/Indonesia/中文）" "Ganti bahasa (English/Indonesia/中文）" "切换语言 (英语/印尼语/中文）")"
   echo "----------------------------------------------------------------"
-  echo " $(T "🆕 v3 Features:" "🆕 Fitur v3:" "🆕 v3 功能：")"
-  echo " [18] $(T "Setup Telegram Bot (remote management)" "Setup Bot Telegram (manajemen remote)" "配置 Telegram Bot（远程管理）")"
-  echo " [19] $(T "Setup Web Dashboard (browser control)" "Setup Web Dashboard (kontrol browser)" "配置 Web 控制面板（浏览器）")"
-  echo " [20] $(T "Setup Auto Backup (daily backups)" "Setup Auto Backup (backup harian)" "配置自动备份（每日备份）")"
-  echo " [21] $(T "Manual Backup Now" "Backup Manual Sekarang" "立即手动备份")"
-  echo " [22] $(T "Install ALL v3 Features" "Instal SEMUA Fitur v3" "安装所有 v3 功能")"
+  echo " [18] $(T "❤️  Support Us — Donate via QRIS" "❤️  Dukung Kami — Donasi via QRIS" "❤️  支持我们 — 通过 QRIS 捐赠")"
+  echo "----------------------------------------------------------------"
+  echo " $(T "🆕 v4 Features:" "🆕 Fitur v4:" "🆕 v4 功能：")"
+  echo " [19] $(T "Setup Telegram Bot (remote management)" "Setup Bot Telegram (manajemen remote)" "配置 Telegram Bot（远程管理）")"
+  echo " [20] $(T "Setup Web Dashboard (browser control)" "Setup Web Dashboard (kontrol browser)" "配置 Web 控制面板（浏览器）")"
+  echo " [21] $(T "Setup Auto Backup (daily backups)" "Setup Auto Backup (backup harian)" "配置自动备份（每日备份）")"
+  echo " [22] $(T "Manual Backup Now" "Backup Manual Sekarang" "立即手动备份")"
+  echo " [23] $(T "Install ALL v4 Features" "Instal SEMUA Fitur v4" "安装所有 v4 功能")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v3" "Dibuat oleh wrwb Store v3" "由 wrwb Store 打造 v3")"
+  echo " $(T "by wrwb Store v4.1" "Dibuat oleh wrwb Store v4.1" "由 wrwb Store 打造 v4.1")"
 }
 
 pause() {
   echo ""
   read -rp "$(T "Press [Enter] to return to the menu..." "Tekan [Enter] untuk kembali ke menu..." "按 [Enter] 返回菜单……")" _
+}
+
+show_qris_donation() {
+  clear 2>/dev/null || true
+  echo "================================================================"
+  echo " $(T "❤️  Support wrwb Store — Donate via QRIS" "❤️  Dukung wrwb Store — Donasi via QRIS" "❤️  支持 wrwb Store — 通过 QRIS 捐赠")"
+  echo "================================================================"
+  echo ""
+  echo "$(T "If you find this VPN installer useful, please consider supporting us!" "Jika installer VPN ini bermanfaat, silakan dukung kami!" "如果您觉得这个 VPN 安装程序有用，请考虑支持我们！")"
+  echo ""
+  echo "$(T "Scan the QRIS code below with your Indonesian banking app:" "Scan kode QRIS di bawah dengan aplikasi perbankan Indonesia Anda:" "使用您的印尼银行应用扫描下方 QRIS 码：")"
+  echo ""
+  
+  local qris_img="$SCRIPT_DIR/qris-pwrwb-store.jpg"
+  if [[ -f "$qris_img" ]]; then
+    if command -v catimg &>/dev/null; then
+      catimg -w 60 "$qris_img" 2>/dev/null || echo "$(T "QRIS image: $qris_img" "Gambar QRIS: $qris_img" "QRIS 图片：$qris_img")"
+    elif command -v viu &>/dev/null; then
+      viu -w 60 "$qris_img" 2>/dev/null || echo "$(T "QRIS image: $qris_img" "Gambar QRIS: $qris_img" "QRIS 图片：$qris_img")"
+    else
+      echo "$(T "QRIS image location: $qris_img" "Lokasi gambar QRIS: $qris_img" "QRIS 图片位置：$qris_img")"
+      echo "$(T "(Install 'catimg' or 'viu' to display QR codes in terminal)" "(Install 'catimg' atau 'viu' untuk menampilkan QR code di terminal)" "（安装 'catimg' 或 'viu' 以在终端显示二维码）")"
+    fi
+  else
+    echo "$(T "QRIS image not found: $qris_img" "Gambar QRIS tidak ditemukan: $qris_img" "未找到 QRIS 图片：$qris_img")"
+  fi
+  
+  echo ""
+  echo "$(T "Thank you for your support! 🙏" "Terima kasih atas dukungan Anda! 🙏" "感谢您的支持！🙏")"
+  echo "================================================================"
 }
 
 menu_switch_language() {
@@ -112,7 +144,7 @@ menu_switch_language() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "$(T "Choose menu [0-22]: " "Pilih menu [0-22]: " "选择菜单 [0-22]：")" choice
+    read -rp "$(T "Choose menu [0-23]: " "Pilih menu [0-23]: " "选择菜单 [0-23]：")" choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -239,22 +271,26 @@ main_loop() {
         pause
         ;;
       18)
-        "$SCRIPT_DIR/setup-telegram-bot.sh"
+        show_qris_donation
         pause
         ;;
       19)
-        "$SCRIPT_DIR/setup-web-dashboard.sh"
+        "$SCRIPT_DIR/setup-telegram-bot.sh"
         pause
         ;;
       20)
-        "$SCRIPT_DIR/setup-auto-backup.sh"
+        "$SCRIPT_DIR/setup-web-dashboard.sh"
         pause
         ;;
       21)
-        "$SCRIPT_DIR/backup.sh" manual
+        "$SCRIPT_DIR/setup-auto-backup.sh"
         pause
         ;;
       22)
+        "$SCRIPT_DIR/backup.sh" manual
+        pause
+        ;;
+      23)
         "$SCRIPT_DIR/setup-all-v3.sh"
         pause
         ;;

@@ -395,6 +395,18 @@ sudo ./uninstall.sh
 
 ---
 
+## ❤️ Dukung Kami — Donasi via QRIS
+
+Jika installer VPN ini bermanfaat untuk Anda, silakan dukung pengembangan kami melalui **QRIS (Quick Response Code Indonesian Standard)**!
+
+Scan kode QRIS di bawah dengan aplikasi perbankan Indonesia atau e-wallet Anda (GoPay, OVO, DANA, ShopeePay, dll):
+
+![QRIS Donation - wrwb Store](qris-pwrwb-store.jpg)
+
+Terima kasih atas dukungan Anda! 🙏
+
+---
+
 ## 🤝 Kontribusi
 
 Pull request & Issues sangat diterima — terutama laporan kompatibilitas untuk distro baru (Ubuntu 26, Debian 13) dan perbaikan aturan firewall/NAT. Jalankan cek sintaks sebelum commit bila `bash` tersedia:

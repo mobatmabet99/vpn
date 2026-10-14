@@ -394,6 +394,18 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 
 ---
 
+## ❤️ 支持我们 — 通过 QRIS 捐赠
+
+如果您觉得这个 VPN 安装程序有用，请考虑通过 **QRIS（印尼快速响应码标准）** 支持我们的开发！
+
+使用您的印尼银行应用或电子钱包（GoPay、OVO、DANA、ShopeePay 等）扫描下方 QRIS 码：
+
+![QRIS Donation - wrwb Store](qris-pwrwb-store.jpg)
+
+感谢您的支持！🙏
+
+---
+
 ## 📄 许可
 
 个人与商业用途均免费。按“现状”提供，不含保证。运行 VPN 服务时请遵守网络服务商法律/ToS。

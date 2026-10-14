@@ -399,6 +399,18 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 
 ---
 
+## ❤️ Support Us — Donate via QRIS
+
+If you find this VPN installer useful, please consider supporting our development via **QRIS (Quick Response Code Indonesian Standard)**!
+
+Scan the QRIS code below with your Indonesian banking app or e-wallet (GoPay, OVO, DANA, ShopeePay, etc):
+
+![QRIS Donation - wrwb Store](qris-pwrwb-store.jpg)
+
+Thank you for your support! 🙏
+
+---
+
 ## 📄 License
 
 Free for personal and commercial use. Provided "as is" without warranty. Ensure compliance with your network provider's laws/ToS when running a VPN service.

@@ -1,12 +1,37 @@
-# Changelog v4 — gRPC Support + Xray v26.10.10
+# Changelog v4 — gRPC Support + Xray v26.10.10 + Donation Support
 
-**Tanggal rilis**: 14 Oktober 2026  
-**Versi**: v4.0.0  
+**Versi terbaru**: v4.1.0  
 **Oleh**: wrwb Store
 
 ---
 
-## 🎉 Fitur Baru v4
+## 🆕 v4.1.0 — Donation Support (14 Oktober 2026)
+
+### Penambahan Menu Donasi QRIS
+
+Menambahkan dukungan donasi untuk mendukung pengembangan proyek ini:
+
+**Fitur baru**:
+- ❤️ **Menu donasi QRIS** di `menu.sh` (menu #18)
+- 📱 **QRIS image** (`qris-pwrwb-store.jpg`) dengan support display di terminal
+- 📖 **Section donasi** di semua README (ID/EN/ZH) sebelum bagian License
+- 🖼️ Auto-detect `catimg` atau `viu` untuk menampilkan QR code di terminal
+
+**Perubahan**:
+- `menu.sh`: Menu shift dari 18-22 → 19-23, menu donasi di slot #18
+- `README.md`: Tambah section "❤️ Dukung Kami — Donasi via QRIS" dengan gambar QRIS
+- `README.en.md`: Tambah section "❤️ Support Us — Donate via QRIS"
+- `README.zh.md`: Tambah section "❤️ 支持我们 — 通过 QRIS 捐赠"
+- Version bump: "by wrwb Store v3" → "by wrwb Store v4.1" di menu footer
+
+**File baru**:
+- `qris-pwrwb-store.jpg`: QRIS code untuk donasi ke wrwb Store
+
+---
+
+## 🎉 v4.0.0 — gRPC Support + Xray v26.10.10 (14 Oktober 2026)
+
+### Fitur Baru v4.0
 
 ### 1. **Dukungan gRPC Lengkap (4 Inbound Baru)**
 
