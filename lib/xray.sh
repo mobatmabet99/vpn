@@ -12,8 +12,12 @@
 #   Trojan WS           10003/tcp  (path /trojan, password = user UUID)
 #   VLESS TCP XTLS      10004/tcp  (flow xtls-rprx-vision)
 #   VLESS TCP REALITY   443/tcp    (flow xtls-rprx-vision, SNI microsoft.com)
+#   VMess gRPC          10005/tcp  (serviceName VMessGRPC) — v4
+#   VLESS gRPC          10006/tcp  (serviceName VLessGRPC) — v4
+#   Trojan gRPC         10007/tcp  (serviceName TrojanGRPC) — v4
+#   VLESS REALITY gRPC  10008/tcp  (serviceName RealityGRPC, with REALITY) — v4
 #
-# Each user gets 1 UUID valid for ALL protocols above.
+# Each user gets 1 UUID valid for ALL protocols above (9 inbounds total).
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -30,7 +34,8 @@ XRAY_SERVICE="xray"
 
 # Versi stabil (cek terbaru di https://github.com/XTLS/Xray-core/releases
 # dan https://github.com/v2fly/v2ray-core/releases). Diperbarui berkala.
-XRAY_VERSION_DEFAULT="v26.3.27"
+# v4: Updated to latest stable with full gRPC support (Oct 2026)
+XRAY_VERSION_DEFAULT="v26.10.10"
 V2RAY_VERSION_DEFAULT="v5.53.0"
 
 # Engine: "xray" (default) atau "v2ray". Bisa dioverride: XRAY_ENGINE=v2ray ./install.sh
@@ -42,6 +47,12 @@ XPORT_VLESS_WS="${XPORT_VLESS_WS:-10002}"
 XPORT_TROJAN_WS="${XPORT_TROJAN_WS:-10003}"
 XPORT_VLESS_XTLS="${XPORT_VLESS_XTLS:-10004}"
 XPORT_VLESS_REALITY="${XPORT_VLESS_REALITY:-443}"
+
+# v4: gRPC ports (efficient, HTTP/2 based, excellent for CDN/reverse proxy)
+XPORT_VMESS_GRPC="${XPORT_VMESS_GRPC:-10005}"
+XPORT_VLESS_GRPC="${XPORT_VLESS_GRPC:-10006}"
+XPORT_TROJAN_GRPC="${XPORT_TROJAN_GRPC:-10007}"
+XPORT_VLESS_REALITY_GRPC="${XPORT_VLESS_REALITY_GRPC:-10008}"
 
 # SNI REALITY default: domain besar yang mendukung TLSv1.3 + H2
 XREALITY_SNI_DEFAULT="${XREALITY_SNI_DEFAULT:-www.microsoft.com}"
@@ -181,6 +192,10 @@ XPORT_VLESS_WS="$XPORT_VLESS_WS"
 XPORT_TROJAN_WS="$XPORT_TROJAN_WS"
 XPORT_VLESS_XTLS="$XPORT_VLESS_XTLS"
 XPORT_VLESS_REALITY="$XPORT_VLESS_REALITY"
+XPORT_VMESS_GRPC="$XPORT_VMESS_GRPC"
+XPORT_VLESS_GRPC="$XPORT_VLESS_GRPC"
+XPORT_TROJAN_GRPC="$XPORT_TROJAN_GRPC"
+XPORT_VLESS_REALITY_GRPC="$XPORT_VLESS_REALITY_GRPC"
 EOF
   chmod 600 "$XRAY_PARAMS"
 
@@ -233,6 +248,67 @@ EOF
           "shortIds": [ "$short_id" ]
         }
       }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": $XPORT_VMESS_GRPC,
+      "protocol": "vmess",
+      "settings": { "clients": [ { "id": "$server_uuid", "alterId": 0 } ] },
+      "streamSettings": { 
+        "network": "grpc", 
+        "grpcSettings": { 
+          "serviceName": "VMessGRPC",
+          "multiMode": false
+        } 
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": $XPORT_VLESS_GRPC,
+      "protocol": "vless",
+      "settings": { "clients": [ { "id": "$server_uuid" } ], "decryption": "none" },
+      "streamSettings": { 
+        "network": "grpc", 
+        "grpcSettings": { 
+          "serviceName": "VLessGRPC",
+          "multiMode": false
+        } 
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": $XPORT_TROJAN_GRPC,
+      "protocol": "trojan",
+      "settings": { "clients": [ { "password": "$server_uuid" } ] },
+      "streamSettings": { 
+        "network": "grpc", 
+        "grpcSettings": { 
+          "serviceName": "TrojanGRPC",
+          "multiMode": false
+        } 
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": $XPORT_VLESS_REALITY_GRPC,
+      "protocol": "vless",
+      "settings": { "clients": [ { "id": "$server_uuid" } ], "decryption": "none" },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "reality",
+        "grpcSettings": { 
+          "serviceName": "RealityGRPC",
+          "multiMode": false
+        },
+        "realitySettings": {
+          "show": false,
+          "dest": "$XREALITY_DEST_DEFAULT",
+          "xver": 0,
+          "serverNames": [ "$XREALITY_SNI_DEFAULT" ],
+          "privateKey": "$priv_key",
+          "shortIds": [ "$short_id" ]
+        }
+      }
     }
   ],
   "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
@@ -246,7 +322,7 @@ EOF
   # Systemd service
   cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
-Description=Xray/V2Ray Service (VMess/VLESS/Trojan + XTLS/REALITY)
+Description=Xray/V2Ray Service v4 (9 inbounds: WS + gRPC + XTLS + REALITY)
 After=network.target
 
 [Service]
@@ -271,8 +347,8 @@ EOF
     die "$(T "${XRAY_ENGINE} install failed to start." "Instalasi ${XRAY_ENGINE} gagal dijalankan." "${XRAY_ENGINE} 安装后启动失败。")"
   fi
 
-  # Open every inbound port in the firewall
-  for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY"; do
+  # Open every inbound port in the firewall (WebSocket + gRPC)
+  for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC"; do
     open_firewall_port "$p" "tcp"
   done
 
@@ -281,13 +357,13 @@ EOF
   chmod 600 "$XRAY_ACCOUNTS_DB"
   echo "server-default:${server_uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
-  log_success "$(T "${XRAY_ENGINE} is active (VMess/VLESS/Trojan + XTLS-Vision + REALITY)." "${XRAY_ENGINE} aktif (VMess/VLESS/Trojan + XTLS-Vision + REALITY)." "${XRAY_ENGINE} 运行中（VMess/VLESS/Trojan + XTLS-Vision + REALITY）。")"
+  log_success "$(T "${XRAY_ENGINE} v4 is active (9 inbounds: WS + gRPC + XTLS + REALITY)." "${XRAY_ENGINE} v4 aktif (9 inbound: WS + gRPC + XTLS + REALITY)." "${XRAY_ENGINE} v4 运行中（9 个入站：WS + gRPC + XTLS + REALITY）。")"
 
   xray_print_links "server-default" "$server_uuid"
 }
 
 # ------------------------------------------------------- link generator
-# Prints vmess://, vless:// and trojan:// links + QR for 1 UUID
+# Prints vmess://, vless:// and trojan:// links (WS + gRPC) + QR for 1 UUID — v4
 xray_print_links() {
   local name="${1:?$(T "username is required" "nama user wajib diisi" "用户名为必需")}"
   local uuid="${2:?$(T "uuid is required" "uuid wajib diisi" "uuid 为必需")}"
@@ -299,50 +375,76 @@ xray_print_links() {
   local pbk="${XREALITY_PUB:-}"
   local sid="${XREALITY_SHORTID:-}"
 
-  # VMess WS (base64 JSON)
+  # WebSocket links
   local vmess_json
   vmess_json="$(printf '{"v":"2","ps":"%s-vmess-ws","add":"%s","port":"%s","id":"%s","aid":"0","net":"ws","type":"none","host":"","path":"/vmess","tls":""}' "$name" "$ip" "$XPORT_VMESS_WS" "$uuid")"
   local vmess_link="vmess://$(echo -n "$vmess_json" | base64 -w 0 2>/dev/null || echo -n "$vmess_json" | base64 | tr -d '\n')"
 
-  # VLESS WS
   local vless_ws_link="vless://${uuid}@${ip}:${XPORT_VLESS_WS}?encryption=none&security=none&type=ws&path=%2Fvless#${name}-vless-ws"
-
-  # Trojan WS (password = UUID)
   local trojan_link="trojan://${uuid}@${ip}:${XPORT_TROJAN_WS}?security=none&type=ws&path=%2Ftrojan#${name}-trojan-ws"
 
-  # VLESS TCP XTLS-Vision (no TLS, for fronting with your own Nginx/CDN TLS when needed)
-  local vless_xtls_link="vless://${uuid}@${ip}:${XPORT_VLESS_XTLS}?encryption=none&flow=xtls-rprx-vision&security=none&type=tcp#${name}-vless-xtls"
+  # gRPC links (v4: HTTP/2 based, excellent for CDN/reverse proxy)
+  local vmess_json_grpc
+  vmess_json_grpc="$(printf '{"v":"2","ps":"%s-vmess-grpc","add":"%s","port":"%s","id":"%s","aid":"0","net":"grpc","type":"none","host":"","path":"VMessGRPC","tls":""}' "$name" "$ip" "$XPORT_VMESS_GRPC" "$uuid")"
+  local vmess_grpc_link="vmess://$(echo -n "$vmess_json_grpc" | base64 -w 0 2>/dev/null || echo -n "$vmess_json_grpc" | base64 | tr -d '\n')"
 
-  # VLESS TCP REALITY + XTLS-Vision (primary: anti-blocking & efficient)
+  local vless_grpc_link="vless://${uuid}@${ip}:${XPORT_VLESS_GRPC}?encryption=none&security=none&type=grpc&serviceName=VLessGRPC#${name}-vless-grpc"
+  local trojan_grpc_link="trojan://${uuid}@${ip}:${XPORT_TROJAN_GRPC}?security=none&type=grpc&serviceName=TrojanGRPC#${name}-trojan-grpc"
+
+  # XTLS & REALITY
+  local vless_xtls_link="vless://${uuid}@${ip}:${XPORT_VLESS_XTLS}?encryption=none&flow=xtls-rprx-vision&security=none&type=tcp#${name}-vless-xtls"
   local vless_reality_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}&type=tcp#${name}-vless-reality"
 
+  # REALITY + gRPC (v4: best for heavy censorship + CDN compatibility)
+  local vless_reality_grpc_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY_GRPC}?encryption=none&security=reality&type=grpc&serviceName=RealityGRPC&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}#${name}-vless-reality-grpc"
+
   echo ""
-  echo "==================== $(T "CONNECTION LINKS" "LINK KONEKSI" "连接链接"): $name ===================="
+  echo "==================== $(T "CONNECTION LINKS v4 (9 PROTOCOLS)" "LINK KONEKSI v4 (9 PROTOKOL)" "连接链接 v4（9 种协议）"): $name ===================="
+  echo ""
+  echo "$(T "=== RECOMMENDED (Top 3) ===" "=== REKOMENDASI (3 Teratas) ===" "=== 推荐（前 3 名）===")"
+  echo ""
   echo "--- [1] VLESS + TCP + XTLS-Vision + REALITY ($(T "PRIMARY, most efficient & anti-blocking" "UTAMA, paling efisien & anti-blokir" "首选，最高效且抗封锁"))"
   echo "$vless_reality_link"
   echo ""
-  echo "--- [2] VLESS + TCP + XTLS-Vision"
+  echo "--- [2] VLESS + gRPC + REALITY ($(T "BEST for heavy censorship + CDN" "TERBAIK untuk sensor berat + CDN" "最适合严重审查 + CDN"))"
+  echo "$vless_reality_grpc_link"
+  echo ""
+  echo "--- [3] VLESS + TCP + XTLS-Vision"
   echo "$vless_xtls_link"
   echo ""
-  echo "--- [3] VMess + WebSocket"
+  echo "$(T "=== WebSocket Transports (CDN compatible) ===" "=== Transport WebSocket (kompatibel CDN) ===" "=== WebSocket 传输（兼容 CDN）===")"
+  echo ""
+  echo "--- [4] VMess + WebSocket"
   echo "$vmess_link"
   echo ""
-  echo "--- [4] VLESS + WebSocket"
+  echo "--- [5] VLESS + WebSocket"
   echo "$vless_ws_link"
   echo ""
-  echo "--- [5] Trojan + WebSocket"
+  echo "--- [6] Trojan + WebSocket"
   echo "$trojan_link"
+  echo ""
+  echo "$(T "=== gRPC Transports (HTTP/2, efficient, CDN compatible) ===" "=== Transport gRPC (HTTP/2, efisien, kompatibel CDN) ===" "=== gRPC 传输（HTTP/2，高效，兼容 CDN）===")"
+  echo ""
+  echo "--- [7] VMess + gRPC"
+  echo "$vmess_grpc_link"
+  echo ""
+  echo "--- [8] VLESS + gRPC"
+  echo "$vless_grpc_link"
+  echo ""
+  echo "--- [9] Trojan + gRPC"
+  echo "$trojan_grpc_link"
   echo "=============================================================="
 
   if command -v qrencode &>/dev/null; then
     echo ""
-    echo "$(T "QR code (VLESS REALITY — scan with v2rayNG / Streisand / FoXray):" "QR Code (VLESS REALITY — pindai dengan v2rayNG / Streisand / FoXray):" "二维码（VLESS REALITY——请用 v2rayNG / Streisand / FoXray 扫描）：")"
+    echo "$(T "QR code (VLESS REALITY — scan with v2rayNG / NekoBox / Streisand):" "QR Code (VLESS REALITY — pindai dengan v2rayNG / NekoBox / Streisand):" "二维码（VLESS REALITY——请用 v2rayNG / NekoBox / Streisand 扫描）：")"
     qrencode -t ansiutf8 "$vless_reality_link" || true
   fi
 
   XRAY_LAST_VMESS="$vmess_link"
   XRAY_LAST_REALITY="$vless_reality_link"
-  export XRAY_LAST_VMESS XRAY_LAST_REALITY
+  XRAY_LAST_REALITY_GRPC="$vless_reality_grpc_link"
+  export XRAY_LAST_VMESS XRAY_LAST_REALITY XRAY_LAST_REALITY_GRPC
 }
 
 # ------------------------------------------------------- user management

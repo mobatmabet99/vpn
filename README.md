@@ -50,7 +50,7 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 |---|---|
 | 🔌 **Protokol utama** | WireGuard (ChaCha20-Poly1305, MTU 1420) dengan auto-generate keypair server + client, Pre-Shared Key (PSK), file `.conf` client & QR Code (PNG + ANSI terminal) |
 | 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket (port 80). Manajemen akun: `add-ssh-user.sh` / `remove-ssh-user.sh` (dengan masa berlaku) |
-| ⚡ **Xray-core (default ON)** | v26.3.27 stabil — 5 inbound sekaligus: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis |
+| ⚡ **Xray-core v4 (default ON)** | v26.10.10 stabil (Okt 2026) — **9 inbound sekaligus**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis. **gRPC = HTTP/2 based, sangat lancar di Debian 13 & Ubuntu 26, cocok untuk CDN/reverse proxy** |
 | 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
 | 🛡️ **Firewall otomatis** | Membuka semua port VPN (UDP + TCP) di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
@@ -272,17 +272,21 @@ Untuk aplikasi tunneling (HTTP Custom, dsb.): gunakan host `IP-SERVER`, port WS 
 
 ---
 
-## ⚡ Xray / V2Ray — Kelola User (VMess / VLESS / Trojan + XTLS / REALITY)
+## ⚡ Xray / V2Ray v4 — Kelola User (VMess / VLESS / Trojan + XTLS / REALITY + gRPC)
 
-Satu user = 1 UUID yang langsung aktif di **semua 5 inbound**:
+Satu user = 1 UUID yang langsung aktif di **semua 9 inbound**:
 
 | # | Protokol | Port | Cocok untuk |
 |---|---|---|---|
 | 1 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Utama** — paling efisien & anti-blokir, tanpa domain/TLS sendiri (SNI `www.microsoft.com`) |
-| 2 | VLESS + TCP + XTLS-Vision | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
-| 3 | VMess + WebSocket (`/vmess`) | 10001 | Kompatibilitas client lama |
-| 4 | VLESS + WebSocket (`/vless`) | 10002 | Balik CDN/reverse-proxy (Cloudflare dsb.) |
-| 5 | Trojan + WebSocket (`/trojan`) | 10003 | Samaran trafik HTTPS |
+| 2 | **VLESS + gRPC + REALITY** | 10008 | **Terbaik untuk sensor berat + CDN** — HTTP/2, sangat stabil di Debian 13/Ubuntu 26 |
+| 3 | VLESS + TCP + XTLS-Vision | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
+| 4 | VMess + WebSocket (`/vmess`) | 10001 | Kompatibilitas client lama |
+| 5 | VLESS + WebSocket (`/vless`) | 10002 | Balik CDN/reverse-proxy (Cloudflare dsb.) |
+| 6 | Trojan + WebSocket (`/trojan`) | 10003 | Samaran trafik HTTPS |
+| 7 | VMess + gRPC (`VMessGRPC`) | 10005 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
+| 8 | VLESS + gRPC (`VLessGRPC`) | 10006 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
+| 9 | Trojan + gRPC (`TrojanGRPC`) | 10007 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
 
 ```bash
 sudo ./add-xray-user.sh hp-andi       # buat user + cetak 5 link + QR REALITY (limit default)
@@ -290,7 +294,7 @@ sudo ./add-xray-user.sh hp-andi 3 200 # buat user dengan limit 3 IP / 200 GB
 sudo ./remove-xray-user.sh hp-andi    # hapus dari semua inbound
 ```
 
-Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas: **VLESS REALITY > VLESS XTLS > VMess/VLESS/Trojan WS**. Salin link diawali `vless://...security=reality...` untuk hasil terbaik.
+Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas v4: **VLESS REALITY (TCP) > VLESS REALITY gRPC > VLESS XTLS > VLESS/VMess/Trojan gRPC > WS**. gRPC sangat stabil & cepat, cocok untuk CDN dan reverse proxy.
 
 Ganti engine default (`xray` → `v2ray`) saat instal: `sudo ./install.sh --with-v2ray --yes` atau `XRAY_ENGINE=v2ray sudo ./install.sh --yes`.
 

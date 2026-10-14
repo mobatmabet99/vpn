@@ -245,7 +245,7 @@ main() {
     # Tunnel engine options — Xray default, V2Ray alternative
     echo ""
     echo "$(T "Choose the tunnel engine (VMess/VLESS/Trojan + XTLS/REALITY):" "Pilih engine tunnel (VMess/VLESS/Trojan + XTLS/REALITY):" "选择隧道引擎 (VMess/VLESS/Trojan + XTLS/REALITY)：")"
-    echo "  1) Xray-core v26.3.27 — $(T "DEFAULT, fastest XTLS-Vision + REALITY" "DEFAULT, XTLS-Vision + REALITY tercepat" "默认，最快的 XTLS-Vision + REALITY")"
+    echo "  1) Xray-core v26.10.10 — $(T "DEFAULT, fastest XTLS-Vision + REALITY + gRPC (9 inbounds)" "DEFAULT, XTLS-Vision + REALITY + gRPC tercepat (9 inbound)" "默认，最快的 XTLS-Vision + REALITY + gRPC（9 个入站）")"
     echo "  2) v2ray-core v5.53.0 — $(T "stable alternative" "alternatif stabil" "稳定的替代方案")"
     echo "  3) $(T "Install neither" "Tidak pasang keduanya" "都不安装")"
     read -rp "$(T "Choose tunnel engine [1-3] (default 1): " "Pilih engine tunnel [1-3] (default 1): " "选择隧道引擎 [1-3]（默认 1）：")" engine_choice
@@ -314,7 +314,7 @@ main() {
   fi
 
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    log_step "$(T "Installing ${XRAY_ENGINE} server (VMess/VLESS/Trojan + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} Server (VMess/VLESS/Trojan + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} 服务器 (VMess/VLESS/Trojan + XTLS/REALITY)……")"
+    log_step "$(T "Installing ${XRAY_ENGINE} v4 server (9 inbounds: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4 Server (9 inbound: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4 服务器 (9 个入站: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)……")"
     xray_setup_server "$SERVER_PUB_IP"
   fi
 
@@ -355,7 +355,7 @@ main() {
     echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "SSH 账号：sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    echo "  - $(T "Xray/V2Ray users: sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray  : sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray 用户：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    echo "  - $(T "Xray/V2Ray v4 users (9 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4 (9 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4 用户（9 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
   fi
   echo ""
 }
