@@ -35,6 +35,8 @@ source "$SCRIPT_DIR/lib/shadowsocks.sh"
 source "$SCRIPT_DIR/lib/ssh.sh"
 # shellcheck source=lib/xray.sh
 source "$SCRIPT_DIR/lib/xray.sh"
+# shellcheck source=lib/ssl.sh
+source "$SCRIPT_DIR/lib/ssl.sh"
 
 need_root
 
@@ -83,9 +85,10 @@ EOF
   echo " [21] $(T "Setup Auto Backup (daily backups)" "Setup Auto Backup (backup harian)" "配置自动备份（每日备份）")"
   echo " [22] $(T "Manual Backup Now" "Backup Manual Sekarang" "立即手动备份")"
   echo " [23] $(T "Install ALL v4 Features" "Instal SEMUA Fitur v4" "安装所有 v4 功能")"
+   echo " [24] $(T "Setup SSL Certificate via acme.sh (standalone/DNS)" "Setup Sertifikat SSL via acme.sh (standalone/DNS)" "经 acme.sh 设置 SSL 证书 (standalone/DNS)")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v4.6" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
+  echo " $(T "by wrwb Store v4.7" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
 }
 
 pause() {
@@ -144,7 +147,7 @@ menu_switch_language() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "$(T "Choose menu [0-23]: " "Pilih menu [0-23]: " "选择菜单 [0-23]：")" choice
+    read -rp "$(T "Choose menu [0-24]: " "Pilih menu [0-24]: " "选择菜单 [0-24]：")" choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -292,6 +295,10 @@ main_loop() {
         ;;
       23)
         "$SCRIPT_DIR/setup-all-v3.sh"
+        pause
+        ;;
+      24)
+        "$SCRIPT_DIR/setup-ssl.sh"
         pause
         ;;
       0)

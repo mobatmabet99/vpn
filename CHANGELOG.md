@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.6. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.7. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.6 (Latest - 14 Oktober 2026)](#v46---dynamic-firewall-handling) — **Dynamic Firewall Handling**
+- [v4.7 (Latest - 14 Oktober 2026)](#v47---otomatisasi-ssltls-certificate-acmesh) — **SSL/TLS via acme.sh**
+- [v4.6 (14 Oktober 2026)](#v46---dynamic-firewall-handling) — Dynamic Firewall Handling
 - [v4.5 (14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — Environment Checks + ARM64 Support
 - [v4.4 (14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — Enhanced OS Detection (20+ distros)
 - [v4.3 (14 Oktober 2026)](#v43---organized-changelog-structure) — Organized Changelog Structure
@@ -24,6 +25,23 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.6. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.7 — Otomatisasi SSL/TLS Certificate (acme.sh)
+
+**Tanggal**: 14 Oktober 2026
+**Detail**: [changelogs/v4.7.md](changelogs/v4.7.md)
+
+### 🔥 Highlight
+
+**Sertifikat TLS otomatis via acme.sh — ringan, tanpa Python berat**
+
+- ✅ **acme.sh** (~300 KB shell, < 10 MB RAM) — bukan Certbot (~50 MB + Python)
+- ✅ **Standalone mode** — port 80 sementara (service penghuni `:80` dihentikan & dikembalikan otomatis)
+- ✅ **DNS API Cloudflare** — tanpa buka port, handal di balik CDN/firewall (`CF_Token`)
+- ✅ **Auto-renew via cron** — cek harian, renew bila sisa < 30 hari + auto-reload Xray
+- ✅ **Menu 24 / `./setup-ssl.sh`** — CLI + interaktif, status di `status.sh`, cleanup di `uninstall.sh`
 
 ---
 
@@ -338,7 +356,8 @@ Jika OS ID tidak dikenali:
 | v4.3 | 13 | (Changelog organization, no new protocols) |
 | v4.4 | 13 | (Enhanced OS detection: 20+ distros) 🔍 |
 | v4.5 | 13 | (Environment checks + ARM64 support) ✅ |
-| **v4.6** | **13** | **(Dynamic firewall handling)** 🔥 |
+| v4.6 | 13 | (Dynamic firewall handling) ✅ |
+| **v4.7** | **13** | **(SSL/TLS via acme.sh)** 🔒 | 🔥 |
 
 ---
 
@@ -384,4 +403,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.6 (Dynamic Firewall + Environment Checks + ARM64 + 13 Protocols)
+**Dibuat oleh wrwb Store** — v4.7 (SSL via acme.sh + Dynamic Firewall + 13 Protocols)

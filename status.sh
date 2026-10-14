@@ -14,6 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
 source "$SCRIPT_DIR/lib/system.sh"
+# shellcheck source=lib/ssl.sh
+source "/lib/ssl.sh"
 
 need_root
 detect_os
@@ -161,6 +163,37 @@ if [[ -f /var/lib/vpn-limits/limits.db ]]; then
 fi
 if [[ -f /var/lib/vpn-limits/suspended.db && -s /var/lib/vpn-limits/suspended.db ]]; then
   echo -e "$(T "Suspended users       : " "User di-suspend       : " "被暂停用户            : ")${_C_RED}$(cut -d: -f1 /var/lib/vpn-limits/suspended.db | tr '\n' ' ')${_C_RESET}"
+fi
+
+# 7. SSL certificate (acme.sh, v4.7)
+echo "--------------------------------------------------------------------------------"
+echo -e "${_C_BOLD}$(T "SSL CERTIFICATE (acme.sh):" "SERTIFIKAT SSL (acme.sh):" "SSL 证书 (acme.sh)：")${_C_RESET}"
+if [[ -x /root/.acme.sh/acme.sh ]]; then
+  if [[ -f /etc/vpn-ssl/params ]]; then
+    # shellcheck disable=SC1091
+    source /etc/vpn-ssl/params
+    echo "$(T "Domain                : ${SSL_DOMAIN:-?}" "Domain                : ${SSL_DOMAIN:-?}" "域名                  : ${SSL_DOMAIN:-?}")"
+    echo "$(T "Mode                  : ${SSL_MODE:-?}" "Mode                  : ${SSL_MODE:-?}" "模式                  : ${SSL_MODE:-?}")"
+    cert_f="/etc/vpn-ssl/${SSL_DOMAIN:-}/fullchain.pem"
+    if [[ -f "$cert_f" ]]; then
+      if openssl x509 -in "$cert_f" -noout -checkend 0 >/dev/null 2>&1; then
+        echo -e "$(T "Certificate           : " "Sertifikat            : " "证书                  : ")${_C_GREEN}[VALID]${_C_RESET} ($(T "expires: $(openssl x509 -in "$cert_f" -noout -enddate 2>/dev/null | cut -d= -f2)" "kedaluwarsa: $(openssl x509 -in "$cert_f" -noout -enddate 2>/dev/null | cut -d= -f2)" "到期：$(openssl x509 -in "$cert_f" -noout -enddate 2>/dev/null | cut -d= -f2)"))"
+      else
+        echo -e "$(T "Certificate           : " "Sertifikat            : " "证书                  : ")${_C_RED}[EXPIRED / INVALID]${_C_RESET}"
+      fi
+    else
+      echo -e "$(T "Certificate file      : " "File sertifikat       : " "证书文件              : ")${_C_RED}[MISSING]${_C_RESET}"
+    fi
+  else
+    echo "$(T "No certificate issued via this installer yet." "Belum ada sertifikat yang diterbitkan via installer ini." "尚未通过此安装程序签发任何证书。")"
+  fi
+  if crontab -l 2>/dev/null | grep -q "acme.sh.*--cron"; then
+    echo -e "$(T "Auto-renew (cron)     : " "Auto-renew (cron)     : " "自动续期 (cron)        : ")${_C_GREEN}[ENABLED]${_C_RESET}"
+  else
+    echo -e "$(T "Auto-renew (cron)     : " "Auto-renew (cron)     : " "自动续期 (cron)        : ")${_C_YELLOW}[NOT SET]${_C_RESET}"
+  fi
+else
+  echo -e "$(T "acme.sh               : " "acme.sh               : " "acme.sh               : ")${_C_YELLOW}[NOT INSTALLED]${_C_RESET} ($(T "run menu 24 or ./setup-ssl.sh" "jalankan menu 24 atau ./setup-ssl.sh" "请运行菜单 24 或 ./setup-ssl.sh"))"
 fi
 
 echo "================================================================================"

@@ -14,6 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
 source "$SCRIPT_DIR/lib/system.sh"
+# shellcheck source=lib/ssl.sh
+source "/lib/ssl.sh"
 
 need_root
 
@@ -141,5 +143,11 @@ if systemctl list-unit-files 2>/dev/null | grep -q "^vpn-limits\\.service"; then
   log_success "$(T "Limit monitor cleaned up." "Monitor limit dibersihkan." "限制监控已清理。")"
 fi
 
+# 8c. Clean SSL certificates (acme.sh, v4.7)
+if [[ -d /etc/vpn-ssl || -x /root/.acme.sh/acme.sh ]]; then
+  log_step "$(T "Cleaning up SSL certificates..." "Membersihkan sertifikat SSL..." "正在清理 SSL 证书...")"
+  ssl_remove || true
+  log_success "$(T "SSL cleaned up." "SSL dibersihkan." "SSL 已清理。")"
+fi
 log_success "$(T "VPN uninstallation complete. The system was restored to its original state." "Uninstalasi VPN selesai. Sistem telah dikembalikan ke kondisi semula." "VPN 卸载完成，系统已恢复到初始状态。")"
 echo "$(T "By wrwb Store" "Dibuat oleh wrwb Store" "由 wrwb Store 打造")"
