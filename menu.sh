@@ -88,7 +88,7 @@ EOF
    echo " [24] $(T "Setup SSL Certificate via acme.sh (standalone/DNS)" "Setup Sertifikat SSL via acme.sh (standalone/DNS)" "经 acme.sh 设置 SSL 证书 (standalone/DNS)")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v4.7" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
+  echo " $(T "by wrwb Store v4.8" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
 }
 
 pause() {

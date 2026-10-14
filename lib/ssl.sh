@@ -92,7 +92,8 @@ ssl_install_acme() {
   fi
   ssl_install_deps
   log_step "$(T "Installing acme.sh (lightweight ACME client)..." "Menginstal acme.sh (ACME client ringan)..." "正在安装 acme.sh（轻量 ACME 客户端）...")"
-  if ! curl -fsSL https://get.acme.sh -o /tmp/get-acme.sh; then
+  track_temp "/tmp/get-acme.sh"
+  if ! curl -fsSL --retry 2 --connect-timeout 15 https://get.acme.sh -o /tmp/get-acme.sh; then
     rm -f /tmp/get-acme.sh
     if [[ "$soft" -eq 1 ]]; then
       log_warn "$(T "Could not download acme.sh installer — skipping pre-install (run menu 24 / setup-ssl.sh later)." "Gagal mengunduh installer acme.sh — pre-instal dilewati (jalankan menu 24 / setup-ssl.sh nanti)." "下载 acme.sh 安装程序失败 — 已跳过预安装（稍后请运行菜单 24 / setup-ssl.sh）。")"
@@ -172,6 +173,10 @@ ssl_cert_days_left() {
 # Mengembalikan daftar service yang dihentikan via SSL_STOPPED_SVCS (dipakai ssl_restore_port80)
 ssl_free_port80() {
   SSL_STOPPED_SVCS=""
+  # v4.8: hard conflict check on :80 (ss/netstat//proc fallback + owner name)
+  if is_port_in_use "80" "tcp"; then
+    log_warn "$(T "Port 80/tcp is occupied (owner: $(port_owner 80 tcp))." "Port 80/tcp ditempati (pemilik: $(port_owner 80 tcp))." "端口 80/tcp 被占用（占用者：$(port_owner 80 tcp)）。")"
+  fi
   if command -v ss &>/dev/null && ss -lnt 2>/dev/null | grep -Eq ":(80)[[:space:]]"; then
     log_warn "$(T "Port 80 is in use — stopping conflicting services temporarily..." "Port 80 sedang dipakai — menghentikan service yang konflik sementara..." "端口 80 被占用 — 正在临时停止冲突服务...")"
     for svc in ssh-ws nginx apache2 httpd caddy trojan-go; do

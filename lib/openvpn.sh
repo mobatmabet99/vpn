@@ -45,6 +45,9 @@ ovpn_setup_server() {
   local iface="${3:-$(get_default_iface)}"
   local pub_ip="${4:-$(get_public_ip)}"
 
+  # v4.8: port-conflict check (default 1194/udp)
+  check_port_free "$port" "$proto" "OpenVPN" --soft || true
+
   mkdir -p "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
   chmod 700 "$OVPN_SERVER_DIR" "$OVPN_CLIENTS_DIR"
 

@@ -274,6 +274,7 @@ wg_remove_client() {
   if [[ -f "$WG_CONF" ]]; then
     local tmp_file
     tmp_file="$(mktemp)"
+  track_temp "$tmp_file"
     awk -v client="$name" '
       BEGIN { skip=0 }
       $0 ~ "^### Client: " client "$" { skip=1; next }

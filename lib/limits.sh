@@ -49,6 +49,7 @@ limits_set() {
   if [[ -f "$LIMITS_DB" ]]; then
     local tmp
     tmp="$(mktemp)"
+    track_temp "$tmp"
     grep -v "^${user}:" "$LIMITS_DB" > "$tmp" 2>/dev/null || true
     cat "$tmp" > "$LIMITS_DB"
     rm -f "$tmp"
@@ -76,6 +77,7 @@ limits_remove() {
     if [[ -f "$f" ]]; then
       local tmp
       tmp="$(mktemp)"
+      track_temp "$tmp"
       grep -v "^${user}:" "$f" > "$tmp" 2>/dev/null || true
       cat "$tmp" > "$f"
       rm -f "$tmp"
@@ -125,6 +127,7 @@ usage_get_bytes() {
     [[ -z "$new_reset" ]] && new_reset="$reset_date"
     local tmp
     tmp="$(mktemp)"
+    track_temp "$tmp"
     grep -v "^${user}:" "$USAGE_DB" > "$tmp" 2>/dev/null || true
     cat "$tmp" > "$USAGE_DB"
     rm -f "$tmp"
@@ -132,6 +135,7 @@ usage_get_bytes() {
     # Reset juga counter last (WireGuard delta)
     if [[ -f "$USAGE_LAST_DB" ]]; then
       tmp="$(mktemp)"
+      track_temp "$tmp"
       grep -v "^${user}:" "$USAGE_LAST_DB" > "$tmp" 2>/dev/null || true
       cat "$tmp" > "$USAGE_LAST_DB"
       rm -f "$tmp"
@@ -158,6 +162,7 @@ usage_add_bytes() {
   new_total="$((current_bytes + add_bytes))"
   local tmp
   tmp="$(mktemp)"
+  track_temp "$tmp"
   grep -v "^${user}:" "$USAGE_DB" > "$tmp" 2>/dev/null || true
   cat "$tmp" > "$USAGE_DB"
   rm -f "$tmp"
@@ -214,6 +219,7 @@ usage_collect_wireguard() {
     # Simpan counter terakhir
     local tmp
     tmp="$(mktemp)"
+    track_temp "$tmp"
     grep -v "^${cname}:" "$USAGE_LAST_DB" > "$tmp" 2>/dev/null || true
     cat "$tmp" > "$USAGE_LAST_DB"
     rm -f "$tmp"
@@ -233,6 +239,7 @@ session_add() {
   local cutoff tmp
   cutoff="$((timestamp - SESSION_WINDOW_DEFAULT))"
   tmp="$(mktemp)"
+  track_temp "$tmp"
   awk -F: -v cut="$cutoff" 'NF==3 && $3 >= cut' "$SESSION_DB" > "$tmp" 2>/dev/null || true
   cat "$tmp" > "$SESSION_DB"
   rm -f "$tmp"
@@ -332,6 +339,7 @@ limits_collect_sessions() {
 
   # Clean up expired entries + deduplicate (user:ip -> newest timestamp)
   tmp="$(mktemp)"
+  track_temp "$tmp"
   awk -F: -v cut="$cutoff" 'NF==3 && $3 >= cut { key=$1":"$2; if ($3 > seen[key]) seen[key]=$3 } END { for (k in seen) print k":"seen[k] }' "$SESSION_DB" > "$tmp" 2>/dev/null || true
   cat "$tmp" > "$SESSION_DB"
   rm -f "$tmp"
@@ -346,6 +354,7 @@ suspend_add() {
   until_epoch="$(($(date +%s) + duration))"
   local tmp
   tmp="$(mktemp)"
+  track_temp "$tmp"
   grep -v "^${user}:" "$SUSPEND_DB" > "$tmp" 2>/dev/null || true
   cat "$tmp" > "$SUSPEND_DB"
   rm -f "$tmp"
@@ -372,6 +381,7 @@ suspend_is_active() {
   else
     # Masa suspend habis: hapus + bersihkan sesi agar perhitungan fresh
     tmp="$(mktemp)"
+    track_temp "$tmp"
     grep -v "^${user}:" "$SUSPEND_DB" > "$tmp" 2>/dev/null || true
     cat "$tmp" > "$SUSPEND_DB"
     rm -f "$tmp"
@@ -400,6 +410,7 @@ suspend_clear_sessions() {
   if [[ -f "$SESSION_DB" ]]; then
     local tmp
     tmp="$(mktemp)"
+    track_temp "$tmp"
     grep -v "^${user}:" "$SESSION_DB" > "$tmp" 2>/dev/null || true
     cat "$tmp" > "$SESSION_DB"
     rm -f "$tmp"

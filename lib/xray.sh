@@ -115,11 +115,13 @@ install_xray_binary() {
 
   local tmp_zip
   tmp_zip="$(mktemp --suffix=.zip)"
+  track_temp "$tmp_zip"
   log_info "$(T "Downloading ${engine} ${ver} (${zip_name}) from GitHub..." "Mengunduh ${engine} ${ver} (${zip_name}) dari GitHub..." "正在从 GitHub 下载 ${engine} ${ver}（${zip_name}）...")"
 
-  if curl -fsSL "$url" -o "$tmp_zip"; then
+  if curl -fsSL --retry 2 --connect-timeout 20 "$url" -o "$tmp_zip"; then
     local tmp_dir
     tmp_dir="$(mktemp -d)"
+    track_temp "$tmp_dir"
     if command -v unzip &>/dev/null; then
       unzip -o -q "$tmp_zip" -d "$tmp_dir"
     elif command -v python3 &>/dev/null; then
@@ -178,6 +180,17 @@ xray_gen_reality_keys() {
 
 xray_setup_server() {
   local pub_ip="${1:-$(get_public_ip)}"
+  # v4.8: port-conflict check for all TCP inbounds (WS 10001-10004, gRPC 10005-10008, XHTTP 80, REALITY 443)
+  check_port_free "$XPORT_VMESS_WS" "tcp" "VMess-WS" --soft || true
+  check_port_free "$XPORT_VLESS_WS" "tcp" "VLESS-WS" --soft || true
+  check_port_free "$XPORT_TROJAN_WS" "tcp" "Trojan-WS" --soft || true
+  check_port_free "$XPORT_VLESS_XTLS" "tcp" "VLESS-XTLS" --soft || true
+  check_port_free "$XPORT_VLESS_REALITY" "tcp" "VLESS-REALITY" --soft || true
+  check_port_free "$XPORT_VMESS_GRPC" "tcp" "VMess-gRPC" --soft || true
+  check_port_free "$XPORT_VLESS_GRPC" "tcp" "VLESS-gRPC" --soft || true
+  check_port_free "$XPORT_TROJAN_GRPC" "tcp" "Trojan-gRPC" --soft || true
+  check_port_free "$XPORT_VLESS_REALITY_GRPC" "tcp" "VLESS-REALITY-gRPC" --soft || true
+  check_port_free "$XPORT_XHTTP_SHARED" "tcp" "XHTTP-shared" --soft || true
   local engine="${XRAY_ENGINE:-$XRAY_ENGINE_DEFAULT}"
 
   install_xray_binary
@@ -592,6 +605,7 @@ xray_create_user() {
   #   Trojan      : { "password": "<uuid>" }
   local tmp
   tmp="$(mktemp)"
+  track_temp "$tmp"
   cp "$XRAY_CONFIG" "${XRAY_CONFIG}.bak.$(date +%Y%m%d%H%M%S)"
 
   python3 - "$XRAY_CONFIG" "$tmp" "$uuid" <<'PYEOF'
@@ -653,6 +667,7 @@ xray_remove_user() {
 
   local tmp
   tmp="$(mktemp)"
+  track_temp "$tmp"
   cp "$XRAY_CONFIG" "${XRAY_CONFIG}.bak.$(date +%Y%m%d%H%M%S)"
 
   python3 - "$XRAY_CONFIG" "$tmp" "$uuid" <<'PYEOF'

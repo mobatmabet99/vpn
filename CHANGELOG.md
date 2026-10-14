@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.7. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.8. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.7 (Latest - 14 Oktober 2026)](#v47---otomatisasi-ssltls-certificate-acmesh) — **SSL/TLS via acme.sh**
+- [v4.8 (Latest - 14 Oktober 2026)](#v48---idempotency--error-handling-script-robustness) — **Idempotency & Error Handling**
+- [v4.7 (14 Oktober 2026)](#v47---otomatisasi-ssltls-certificate-acmesh) — **SSL/TLS via acme.sh**
 - [v4.6 (14 Oktober 2026)](#v46---dynamic-firewall-handling) — Dynamic Firewall Handling
 - [v4.5 (14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — Environment Checks + ARM64 Support
 - [v4.4 (14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — Enhanced OS Detection (20+ distros)
@@ -25,6 +26,21 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.7. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.8 — Idempotency & Error Handling (Script Robustness)
+
+**Tanggal**: 14 Oktober 2026
+**Detail**: [changelogs/v4.8.md](changelogs/v4.8.md)
+
+### 🔥 Highlight
+
+**Script anti-gagal: strict mode + cek port + auto-cleanup**
+
+- ✅ **Strict mode teraudit** — `set -euo pipefail` di 19 script, `|| die` di titik kritis, curl `--retry`
+- ✅ **Cek port bentrok semua layanan** — SSH/Xray/OpenVPN/Shadowsocks/Web/SSL + nama pemilik proses
+- ✅ **Auto-cleanup via trap** — gagal/Ctrl+C kapan pun, `/tmp` tetap bersih
 
 ---
 
@@ -358,7 +374,8 @@ Jika OS ID tidak dikenali:
 | v4.4 | 13 | (Enhanced OS detection: 20+ distros) 🔍 |
 | v4.5 | 13 | (Environment checks + ARM64 support) ✅ |
 | v4.6 | 13 | (Dynamic firewall handling) ✅ |
-| **v4.7** | **13** | **(SSL/TLS via acme.sh)** 🔒 | 🔥 |
+| v4.7 | 13 | (SSL/TLS via acme.sh) 🔒 |
+| **v4.8** | **13** | **(Robustness: strict + portcheck + trap)** 🛡️ | 🔒 | 🔥 |
 
 ---
 
@@ -404,4 +421,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.7 (SSL via acme.sh + Dynamic Firewall + 13 Protocols)
+**Dibuat oleh wrwb Store** — v4.8 (Robustness + SSL + Dynamic Firewall + 13 Protocols)

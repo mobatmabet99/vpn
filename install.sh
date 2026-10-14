@@ -163,6 +163,9 @@ main() {
 
   print_banner
 
+  # v4.8: auto-cleanup tracked temp files on EXIT/INT/TERM
+  install_cleanup_trap
+
   # 2. Comprehensive environment check (v4.5: root, CPU arch, virt, TUN/TAP, OS)
   check_environment
 

@@ -16,6 +16,7 @@ source "$SCRIPT_DIR/lib/ssh.sh"
 # shellcheck source=lib/limits.sh
 source "$SCRIPT_DIR/lib/limits.sh"
 
+install_cleanup_trap
 need_root
 
 USERNAME="${1:-}"

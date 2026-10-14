@@ -13,6 +13,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/system.sh
 source "$SCRIPT_DIR/lib/system.sh"
 
+install_cleanup_trap
 need_root
 
 echo "================================================================"
@@ -113,6 +114,9 @@ WantedBy=multi-user.target
 EOF
 
 # Open firewall port
+# v4.8: port-conflict check for dashboard port (default 3000/tcp)
+check_port_free "$WEB_PORT" "tcp" "Web-Dashboard" --soft || true
+
 log_info "Opening firewall port $WEB_PORT..."
 open_firewall_port "$WEB_PORT" "tcp" "Web-Dashboard"
 

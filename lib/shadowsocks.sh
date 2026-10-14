@@ -47,7 +47,8 @@ install_shadowsocks_binary() {
     log_info "$(T "Downloading shadowsocks-rust ($ss_ver) from GitHub..." "Mengunduh shadowsocks-rust ($ss_ver) dari GitHub..." "正在从 GitHub 下载 shadowsocks-rust（$ss_ver）...")"
     local tmp_tar
     tmp_tar="$(mktemp --suffix=.tar.xz)"
-    if curl -fsSL "$ss_url" -o "$tmp_tar"; then
+    track_temp "$tmp_tar"
+    if curl -fsSL --retry 2 --connect-timeout 20 "$ss_url" -o "$tmp_tar"; then
       tar -xJf "$tmp_tar" -C /usr/local/bin ssserver 2>/dev/null || tar -xvf "$tmp_tar" -C /usr/local/bin ssserver
       chmod 755 /usr/local/bin/ssserver
       rm -f "$tmp_tar"
@@ -72,6 +73,10 @@ ss_setup_server() {
   local password="${2:-$(gen_password 20)}"
   local method="${3:-$SS_METHOD_DEFAULT}"
   local pub_ip="${4:-$(get_public_ip)}"
+
+  # v4.8: port-conflict check (TCP + UDP, default 8388)
+  check_port_free "$port" "tcp" "Shadowsocks" --soft || true
+  check_port_free "$port" "udp" "Shadowsocks" --soft || true
 
   install_shadowsocks_binary
 

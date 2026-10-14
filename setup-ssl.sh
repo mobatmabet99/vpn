@@ -21,6 +21,7 @@ source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
 source "$SCRIPT_DIR/lib/ssl.sh"
 
+install_cleanup_trap
 need_root
 
 DOMAIN="" MODE="" EMAIL="" DNS_PROVIDER="cloudflare" FORCE=0 SHOW_STATUS=0 DO_RENEW=0 RENEW_FORCE=0

@@ -17,6 +17,7 @@ source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
 source "/lib/ssl.sh"
 
+install_cleanup_trap
 need_root
 
 echo "================================================================================"

@@ -459,17 +459,114 @@ get_public_ip() {
 
 is_port_in_use() {
   local port="$1" proto="${2:-udp}"
+  # v4.8: robust listener check — ss (iproute2) > netstat > /proc fallback.
+  # Matches ":port " at line end OR ":port" followed by whitespace (ss/netstat
+  # column layout differs per distro: "0.0.0.0:port", "[::]:port").
+  local pat=":${port}([[:space:]]|$)"
   if command -v ss &>/dev/null; then
     if [[ "$proto" == "udp" ]]; then
-      ss -lnu 2>/dev/null | grep -q ":${port} "
+      ss -lnu 2>/dev/null | grep -Eq "$pat" && return 0 || return 1
     else
-      ss -lnt 2>/dev/null | grep -q ":${port} "
+      ss -lnt 2>/dev/null | grep -Eq "$pat" && return 0 || return 1
     fi
-  else
-    return 1
   fi
+  if command -v netstat &>/dev/null; then
+    if [[ "$proto" == "udp" ]]; then
+      netstat -lnu 2>/dev/null | grep -Eq "$pat" && return 0 || return 1
+    else
+      netstat -lnt 2>/dev/null | grep -Eq "$pat" && return 0 || return 1
+    fi
+  fi
+  # Last resort: /proc/net/{tcp,tcp6,udp,udp6} (hex port, always available on Linux)
+  local hexpat
+  hexpat="$(printf ":%04X" "$port" 2>/dev/null || echo "")"
+  if [[ -n "$hexpat" ]]; then
+    local f
+    for f in /proc/net/tcp /proc/net/tcp6; do
+      [[ "$proto" == "tcp" && -r "$f" ]] || continue
+      grep -qi " ${hexpat} " "$f" 2>/dev/null && return 0
+    done
+    for f in /proc/net/udp /proc/net/udp6; do
+      [[ "$proto" == "udp" && -r "$f" ]] || continue
+      grep -qi " ${hexpat} " "$f" 2>/dev/null && return 0
+    done
+  fi
+  return 1
 }
 
+# v4.8: name the process(es) listening on a port (best effort).
+# Prints e.g. "nginx(1234)" or "?" when the owner cannot be determined.
+port_owner() {
+  local port="$1" proto="${2:-tcp}"
+  local owners=""
+  if command -v ss &>/dev/null; then
+    local flag="-lnt"
+    [[ "$proto" == "udp" ]] && flag="-lnu"
+    owners="$(ss $flag -p 2>/dev/null | grep -E ":${port}([[:space:]]|$)" | grep -oE '"[^"]+"' | tr "\n" " " || true)"
+  fi
+  if [[ -z "$owners" ]] && command -v lsof &>/dev/null; then
+    local lp
+    lp="$(lsof -i"${proto^^}":"$port" -s"${proto^^}":LISTEN -t 2>/dev/null | head -n3 | tr "\n" "," || true)"
+    [[ -n "$lp" ]] && owners="pid($lp)"
+  fi
+  if [[ -z "$owners" ]] && command -v netstat &>/dev/null; then
+    owners="$(netstat -lntp 2>/dev/null | grep -E ":${port}([[:space:]]|$)" | awk '{print $NF}' | head -n1 || true)"
+  fi
+  echo "${owners:-?}"
+}
+
+# v4.8: check a TCP/UDP port before binding; warn + ask unless --yes/soft.
+# Usage: check_port_free <port> <proto> <label> [--soft]
+#   --soft  => only warn + return 1 (caller decides; never prompts, never dies)
+# Returns 0 when free, 1 when in use.
+check_port_free() {
+  local port="$1" proto="${2:-tcp}" label="${3:-service}" mode="${4:-}"
+  if is_port_in_use "$port" "$proto"; then
+    local owner
+    owner="$(port_owner "$port" "$proto")"
+    log_warn "$(T "Port $port/$proto for $label is already in use (owner: $owner)." "Port $port/$proto untuk $label sudah dipakai (pemilik: $owner)." "供 $label 使用的端口 $port/$proto 已被占用（占用者：$owner）。")"
+    log_warn "$(T "Common culprits: nginx/apache2/httpd/caddy or a previous install. Hint: ss -lntp | grep ':$port '" "Penyebab umum: nginx/apache2/httpd/caddy atau instalasi sebelumnya. Petunjuk: ss -lntp | grep ':$port '" "常见占用者：nginx/apache2/httpd/caddy 或旧安装。提示：ss -lntp | grep ':$port '")"
+    if [[ "$mode" == "--soft" ]]; then
+      return 1
+    fi
+    if [[ "${CLI_YES:-0}" -eq 0 && "${AUTO_YES:-0}" -eq 0 ]]; then
+      confirm "$(T "Continue with port $port/$proto anyway? [y/N] " "Tetap lanjutkan dengan port $port/$proto? [y/N] " "仍要继续使用端口 $port/$proto 吗？[y/N] ")" || \
+        die "$(T "Aborted: port $port/$proto is occupied. Free it or pick another port." "Dibatalkan: port $port/$proto ditempati. Bebaskan atau pilih port lain." "已中止：端口 $port/$proto 被占用。请释放或换用其他端口。")"
+      return 0
+    fi
+    log_warn "$(T "Continuing anyway (--yes mode)." "Tetap lanjut (--yes mode)." "仍继续（--yes 模式）。")"
+    return 1
+  fi
+  return 0
+}
+
+# v4.8: register a temp file/dir for auto-cleanup via trap.
+# Usage: track_temp <path>  — paths are removed on EXIT/INT/TERM.
+VPN_TMP_TRACKED=""
+track_temp() {
+  VPN_TMP_TRACKED="$VPN_TMP_TRACKED $1"
+}
+
+# v4.8: install EXIT/INT/TERM trap that removes all tracked temp files.
+# Safe to call multiple times (only the first call installs the trap).
+VPN_TRAP_INSTALLED="${VPN_TRAP_INSTALLED:-0}"
+install_cleanup_trap() {
+  if [[ "${VPN_TRAP_INSTALLED:-0}" == "1" ]]; then
+    return 0
+  fi
+  VPN_TRAP_INSTALLED=1
+  trap vpn_cleanup_tracked EXIT INT TERM
+}
+
+vpn_cleanup_tracked() {
+  local p
+  # shellcheck disable=SC2086
+  for p in $VPN_TMP_TRACKED; do
+    [[ -n "$p" && -e "$p" ]] || continue
+    rm -rf "$p" 2>/dev/null || true
+  done
+  VPN_TMP_TRACKED=""
+}
 gen_password() {
   local len="${1:-16}"
   if command -v openssl &>/dev/null; then

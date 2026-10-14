@@ -308,6 +308,12 @@ ssh_setup_server() {
   local ssl_port="${4:-444}"
   local ws_port="${5:-8080}"
 
+  # v4.8: port-conflict check (SSH 22, Dropbear 143, Stunnel 444, WS 8080)
+  check_port_free "$ssh_port" "tcp" "SSH" --soft || true
+  check_port_free "$dropbear_port" "tcp" "Dropbear" --soft || true
+  check_port_free "$ssl_port" "tcp" "Stunnel" --soft || true
+  check_port_free "$ws_port" "tcp" "SSH-WebSocket" --soft || true
+
   install_ssh_packages
   ssh_harden_config
   ssh_setup_dropbear "$dropbear_port"

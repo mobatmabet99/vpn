@@ -54,6 +54,7 @@
 | 🔄 **备用引擎** | v2ray-core v5.53.0 (通过 `--with-v2ray` 或 `XRAY_ENGINE=v2ray` 切换)；OpenVPN 2.7/2.6 (加密 `AES-256-GCM` + `CHACHA20-POLY1305`，认证 `SHA512`，TLS 最低 1.3，`.ovpn` 配置) 可替代 SSH |
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
 | 🔒 **自动 SSL (v4.7)** | 经 **acme.sh** 签发 TLS 证书（轻量，无重型 Python 依赖）— **Standalone** 模式（临时端口 80）或 **Cloudflare DNS API**（不怕 CDN/防火墙）。cron 自动续期，存于 `/etc/vpn-ssl/<domain>/`，可用于 Xray TLS / Stunnel / Nginx。菜单 24 / `./setup-ssl.sh`（`install.sh` 默认预安装 acme.sh，经 `--no-ssl` 禁用）|
+| 🛡️ **健壮性 (v4.8)** | 所有脚本 **严格模式**（`set -euo pipefail` + `|| die`），SSH/Xray/OpenVPN/Shadowsocks/Web/SSL **端口冲突检查**（经 `ss`/`lsof` 显示占用者，`/proc/net` 兜底），`EXIT/INT/TERM` trap **自动清理临时文件** — 中途失败不留垃圾。|
 | 🛡️ **自动防火墙** | 检测活动的防火墙后端（**UFW** / **firewalld** / **nftables** / **iptables**），仅在包过滤启用时开放 VPN 端口 — 幂等，无重复规则 |
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |

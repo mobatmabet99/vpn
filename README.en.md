@@ -54,6 +54,7 @@
 | 🔄 **Alternative engine** | v2ray-core v5.53.0 (switch via `--with-v2ray` or `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, `.ovpn` profile) as SSH replacement |
 | 👻 **Shadowsocks (optional)** | shadowsocks-rust v1.25.0, AEAD-2022 cipher `2022-blake3-aes-256-gcm` + `ss://` URI + QR |
 | 🔒 **Auto SSL (v4.7)** | TLS certificates via **acme.sh** (lightweight, no heavy Python) — **Standalone** mode (temporary port 80) or **Cloudflare DNS API** (CDN/firewall-proof). Auto-renew via cron, stored in `/etc/vpn-ssl/<domain>/` for Xray TLS / Stunnel / Nginx. acme.sh **pre-installed by default** during `install.sh` (disable via `--no-ssl`) — issue certs via Menu 24 / `./setup-ssl.sh` |
+| 🛡️ **Robustness (v4.8)** | **Strict mode** (`set -euo pipefail` + `|| die`) in all scripts, **port-conflict checks** (process owner via `ss`/`lsof`, `/proc/net` fallback) for SSH/Xray/OpenVPN/Shadowsocks/Web/SSL, and **temp auto-cleanup** via `EXIT/INT/TERM` trap — mid-install failures leave no junk. |
 | 🛡️ **Auto firewall** | Detects the active firewall backend (**UFW** / **firewalld** / **nftables** / **iptables**) and opens VPN ports only when filtering is active — idempotent, no duplicate rules |
 | 🌐 **IP Forwarding** | Enables `net.ipv4.ip_forward=1` + IPv6 forwarding persistently (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
