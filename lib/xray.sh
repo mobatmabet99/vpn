@@ -71,10 +71,23 @@ xray_detect_arch() {
   local arch
   arch="$(uname -m)"
   case "$arch" in
-    x86_64|amd64) echo "64" ;;
-    aarch64|arm64) echo "arm64-v8a" ;;
-    armv7l|armhf) echo "arm32-v7a" ;;
-    *) die "$(T "CPU architecture '$arch' is not supported automatically for Xray/V2Ray." "Arsitektur CPU '$arch' belum didukung otomatis untuk Xray/V2Ray." "CPU 架构 '$arch' 不支持 Xray/V2Ray 自动安装。")" ;;
+    x86_64|amd64) 
+      echo "64" 
+      ;;
+    aarch64|arm64) 
+      echo "arm64-v8a" 
+      ;;
+    armv7l|armhf|armv7*) 
+      echo "arm32-v7a" 
+      ;;
+    armv6l|armv6*) 
+      echo "arm32-v6" 
+      ;;
+    *) 
+      log_error "$(T "CPU architecture '$arch' is not supported for Xray/V2Ray auto-install." "Arsitektur CPU '$arch' tidak didukung untuk instalasi otomatis Xray/V2Ray." "CPU 架构 '$arch' 不支持 Xray/V2Ray 自动安装。")"
+      log_error "$(T "Supported: x86_64 (amd64), aarch64 (arm64), armv7 (arm32)" "Didukung: x86_64 (amd64), aarch64 (arm64), armv7 (arm32)" "支持：x86_64（amd64）、aarch64（arm64）、armv7（arm32）")"
+      die "$(T "Unsupported CPU architecture: $arch" "Arsitektur CPU tidak didukung: $arch" "不支持的 CPU 架构：$arch")"
+      ;;
   esac
 }
 

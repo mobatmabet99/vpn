@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.4. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.5. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.4 (Latest - 14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — **Enhanced OS Detection (20+ distros)**
+- [v4.5 (Latest - 14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — **Environment Checks + ARM64 Support**
+- [v4.4 (14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — Enhanced OS Detection (20+ distros)
 - [v4.3 (14 Oktober 2026)](#v43---organized-changelog-structure) — Organized Changelog Structure
 - [v4.2 (14 Oktober 2026)](#v42---xhttp-transport-ultimate-http-stealth) — **XHTTP Transport (Port 80/443)**
 - [v4.1 (14 Oktober 2026)](#v41---donation-support) — Donation Support (QRIS)
@@ -22,6 +23,51 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.4. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.5 — Comprehensive Environment & Access Checks + ARM64 Support
+
+**Tanggal**: 14 Oktober 2026  
+**Detail**: [changelogs/v4.0-v4.5.md](changelogs/v4.0-v4.5.md)
+
+### ✅ Highlight
+
+**5-Step Comprehensive Environment Validation + Full ARM64 Support**
+
+- ✅ **5-step environment check** — Root, CPU arch, Virtualization, TUN/TAP, OS
+- ✅ **ARM64/aarch64 full support** — Oracle Cloud, AWS Graviton, Hetzner CAX, Raspberry Pi
+- ✅ **Smart virtualization detection** — KVM, QEMU, VMware, Xen, Hyper-V, OpenVZ, LXC
+- ✅ **TUN/TAP validation** — Auto-check dengan specific error messages
+- ✅ **CPU architecture validation** — x86_64, aarch64, armv7 supported
+- ✅ **Consolidated checks** — Clean, informative, user-friendly
+
+### 5-Step Environment Check
+
+1. **Root Access** — Verify UID 0
+2. **CPU Architecture** — Detect x86_64 (amd64) or aarch64 (arm64)
+3. **Virtualization Type** — KVM, QEMU, VMware, Xen, Hyper-V, OpenVZ, LXC
+4. **TUN/TAP Device** — Check `/dev/net/tun` availability
+5. **OS Detection** — Distro, version, package manager, kernel
+
+### ARM64 VPS Support (NEW)
+
+**Fully supported ARM64 providers**:
+- Oracle Cloud ARM (Ampere Altra)
+- AWS Graviton (a1, t4g, c6g, m6g)
+- Hetzner Cloud CAX
+- Scaleway ARM
+- Raspberry Pi 4/5 (64-bit)
+- Apple Silicon (via Linux VM)
+
+### CPU Architecture Support
+
+| Architecture | Status | Binary | Notes |
+|--------------|--------|--------|-------|
+| x86_64 (amd64) | ✅ Full | `64` | Most common |
+| aarch64 (arm64) | ✅ Full | `arm64-v8a` | **NEW in v4.5** |
+| armv7 (arm32) | ⚠️ Limited | `arm32-v7a` | WireGuard OK |
+| i386 (32-bit) | ❌ Not supported | - | Use 64-bit |
 
 ---
 
@@ -271,7 +317,8 @@ Jika OS ID tidak dikenali:
 | v4.1 | 9 | (Donation support, no new protocols) |
 | v4.2 | 13 | + 4 XHTTP (VMess/VLESS/Trojan/REALITY) 🏆 |
 | v4.3 | 13 | (Changelog organization, no new protocols) |
-| **v4.4** | **13** | **(Enhanced OS detection: 20+ distros)** 🔍 |
+| v4.4 | 13 | (Enhanced OS detection: 20+ distros) 🔍 |
+| **v4.5** | **13** | **(Environment checks + ARM64 support)** ✅ |
 
 ---
 
@@ -317,4 +364,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.4 (Enhanced OS Detection + XHTTP Transport + 13 Protocols Total)
+**Dibuat oleh wrwb Store** — v4.5 (Environment Checks + ARM64 Support + XHTTP Transport + 13 Protocols)

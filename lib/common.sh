@@ -52,6 +52,181 @@ need_root() {
   fi
 }
 
+# ---------------------------------------------------------------- CPU Architecture
+# Returns: amd64, arm64, arm32, or unknown
+detect_cpu_arch() {
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64)
+      echo "amd64"
+      ;;
+    aarch64|arm64)
+      echo "arm64"
+      ;;
+    armv7l|armhf|armv7*)
+      echo "arm32"
+      ;;
+    i386|i686)
+      echo "i386"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+check_cpu_arch() {
+  local arch
+  arch="$(detect_cpu_arch)"
+  
+  export CPU_ARCH="$arch"
+  
+  log_info "$(T "CPU Architecture: $arch ($(uname -m))" "Arsitektur CPU: $arch ($(uname -m))" "CPU 架构：$arch ($(uname -m))")"
+  
+  case "$arch" in
+    amd64)
+      log_success "$(T "x86_64/amd64 detected — fully supported" "x86_64/amd64 terdeteksi — didukung penuh" "检测到 x86_64/amd64 — 完全支持")"
+      return 0
+      ;;
+    arm64)
+      log_success "$(T "ARM64/aarch64 detected — fully supported (v4.5+)" "ARM64/aarch64 terdeteksi — didukung penuh (v4.5+)" "检测到 ARM64/aarch64 — 完全支持（v4.5+）")"
+      return 0
+      ;;
+    arm32)
+      log_warn "$(T "ARM32 detected — limited support (WireGuard OK, Xray may need manual binary)" "ARM32 terdeteksi — dukungan terbatas (WireGuard OK, Xray mungkin perlu binary manual)" "检测到 ARM32 — 支持有限（WireGuard 可用，Xray 可能需要手动二进制文件）")"
+      return 1
+      ;;
+    i386)
+      log_error "$(T "32-bit x86 is not supported. Use 64-bit OS (amd64 or arm64)." "x86 32-bit tidak didukung. Gunakan OS 64-bit (amd64 atau arm64)." "不支持 32 位 x86。请使用 64 位系统（amd64 或 arm64）。")"
+      return 1
+      ;;
+    *)
+      log_error "$(T "Unknown CPU architecture: $(uname -m). Supported: x86_64 (amd64), aarch64 (arm64)." "Arsitektur CPU tidak dikenal: $(uname -m). Didukung: x86_64 (amd64), aarch64 (arm64)." "未知 CPU 架构：$(uname -m)。支持：x86_64（amd64）、aarch64（arm64）。")"
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------- Virtualization Check
+check_virtualization() {
+  local virt_type="bare-metal"
+  
+  if command -v systemd-detect-virt &>/dev/null; then
+    virt_type="$(systemd-detect-virt 2>/dev/null || echo "unknown")"
+  elif [[ -f /proc/cpuinfo ]]; then
+    if grep -q "hypervisor" /proc/cpuinfo 2>/dev/null; then
+      virt_type="hypervisor"
+    fi
+  fi
+  
+  export VIRT_TYPE="$virt_type"
+  
+  case "$virt_type" in
+    none|bare-metal)
+      log_info "$(T "Virtualization: Bare metal (no virtualization detected)" "Virtualisasi: Bare metal (tidak ada virtualisasi)" "虚拟化：裸机（未检测到虚拟化）")"
+      ;;
+    kvm)
+      log_info "$(T "Virtualization: KVM — fully supported" "Virtualisasi: KVM — didukung penuh" "虚拟化：KVM — 完全支持")"
+      ;;
+    qemu)
+      log_info "$(T "Virtualization: QEMU — fully supported" "Virtualisasi: QEMU — didukung penuh" "虚拟化：QEMU — 完全支持")"
+      ;;
+    vmware)
+      log_info "$(T "Virtualization: VMware — fully supported" "Virtualisasi: VMware — didukung penuh" "虚拟化：VMware — 完全支持")"
+      ;;
+    virtualbox)
+      log_info "$(T "Virtualization: VirtualBox — supported" "Virtualisasi: VirtualBox — didukung" "虚拟化：VirtualBox — 支持")"
+      ;;
+    xen)
+      log_info "$(T "Virtualization: Xen — supported" "Virtualisasi: Xen — didukung" "虚拟化：Xen — 支持")"
+      ;;
+    hyperv|microsoft)
+      log_info "$(T "Virtualization: Hyper-V — supported" "Virtualisasi: Hyper-V — didukung" "虚拟化：Hyper-V — 支持")"
+      ;;
+    openvz)
+      log_warn "$(T "Virtualization: OpenVZ — TUN/TAP may not be available (check with provider)" "Virtualisasi: OpenVZ — TUN/TAP mungkin tidak tersedia (cek dengan provider)" "虚拟化：OpenVZ — TUN/TAP 可能不可用（请与提供商确认）")"
+      ;;
+    lxc|lxc-libvirt)
+      log_warn "$(T "Virtualization: LXC — TUN/TAP may need special configuration" "Virtualisasi: LXC — TUN/TAP mungkin perlu konfigurasi khusus" "虚拟化：LXC — TUN/TAP 可能需要特殊配置")"
+      ;;
+    docker|container*)
+      log_error "$(T "Virtualization: Docker/Container — NOT SUPPORTED (requires privileged mode + TUN/TAP)" "Virtualisasi: Docker/Container — TIDAK DIDUKUNG (butuh privileged mode + TUN/TAP)" "虚拟化：Docker/容器 — 不支持（需要特权模式 + TUN/TAP）")"
+      return 1
+      ;;
+    *)
+      log_info "$(T "Virtualization: $virt_type (unknown type, may work)" "Virtualisasi: $virt_type (tipe tidak dikenal, mungkin bekerja)" "虚拟化：$virt_type（未知类型，可能有效）")"
+      ;;
+  esac
+  
+  return 0
+}
+
+# ---------------------------------------------------------------- TUN/TAP Check
+check_tun_tap() {
+  log_step "$(T "Checking TUN/TAP device availability..." "Memeriksa ketersediaan device TUN/TAP..." "正在检查 TUN/TAP 设备可用性...")"
+  
+  if [[ ! -c /dev/net/tun ]]; then
+    log_error "$(T "/dev/net/tun is NOT available" "/dev/net/tun TIDAK tersedia" "/dev/net/tun 不可用")"
+    log_error "$(T "WireGuard and OpenVPN require TUN/TAP device." "WireGuard dan OpenVPN membutuhkan device TUN/TAP." "WireGuard 和 OpenVPN 需要 TUN/TAP 设备。")"
+    
+    if [[ "$VIRT_TYPE" == "openvz" || "$VIRT_TYPE" == "lxc"* ]]; then
+      log_error "$(T "OpenVZ/LXC detected: Enable TUN/TAP in your VPS control panel" "OpenVZ/LXC terdeteksi: Aktifkan TUN/TAP di panel kontrol VPS Anda" "检测到 OpenVZ/LXC：请在 VPS 控制面板中启用 TUN/TAP")"
+      log_error "$(T "Or contact your VPS provider to enable TUN/TAP support." "Atau hubungi provider VPS Anda untuk mengaktifkan TUN/TAP." "或联系您的 VPS 提供商以启用 TUN/TAP 支持。")"
+    else
+      log_error "$(T "Try: sudo modprobe tun" "Coba: sudo modprobe tun" "请尝试：sudo modprobe tun")"
+      log_error "$(T "Or check kernel config: CONFIG_TUN=m or CONFIG_TUN=y" "Atau cek konfigurasi kernel: CONFIG_TUN=m atau CONFIG_TUN=y" "或检查内核配置：CONFIG_TUN=m 或 CONFIG_TUN=y")"
+    fi
+    
+    die "$(T "Cannot proceed without TUN/TAP. Fix the issue and try again." "Tidak bisa melanjutkan tanpa TUN/TAP. Perbaiki masalahnya lalu coba lagi." "没有 TUN/TAP 无法继续。请修复问题后重试。")"
+  fi
+  
+  log_success "$(T "/dev/net/tun is available — WireGuard & OpenVPN can work" "/dev/net/tun tersedia — WireGuard & OpenVPN bisa berjalan" "/dev/net/tun 可用 — WireGuard 和 OpenVPN 可运行")"
+  
+  # Try to load tun module if not loaded
+  if ! lsmod | grep -q "^tun"; then
+    log_info "$(T "TUN module not loaded, attempting to load..." "Modul TUN belum dimuat, mencoba memuat..." "TUN 模块未加载，正在尝试加载...")"
+    modprobe tun 2>/dev/null || log_warn "$(T "modprobe tun failed (may be built-in)" "modprobe tun gagal (mungkin built-in)" "modprobe tun 失败（可能内置）")"
+  fi
+  
+  return 0
+}
+
+# ---------------------------------------------------------------- Comprehensive Environment Check
+check_environment() {
+  log_step "$(T "Performing comprehensive environment check..." "Melakukan pemeriksaan environment menyeluruh..." "正在执行全面的环境检查...")"
+  
+  # 1. Root access
+  log_info "$(T "[1/5] Checking root access..." "[1/5] Memeriksa akses root..." "[1/5] 正在检查 root 访问权限...")"
+  need_root
+  log_success "$(T "Root access confirmed (UID: $EUID)" "Akses root terkonfirmasi (UID: $EUID)" "root 访问已确认（UID：$EUID）")"
+  
+  # 2. CPU architecture
+  log_info "$(T "[2/5] Checking CPU architecture..." "[2/5] Memeriksa arsitektur CPU..." "[2/5] 正在检查 CPU 架构...")"
+  if ! check_cpu_arch; then
+    if [[ "${FORCE_ARCH:-0}" != "1" ]]; then
+      die "$(T "Unsupported CPU architecture. Set FORCE_ARCH=1 to override (at your own risk)." "Arsitektur CPU tidak didukung. Set FORCE_ARCH=1 untuk override (risiko sendiri)." "不支持的 CPU 架构。设置 FORCE_ARCH=1 以覆盖（风险自负）。")"
+    fi
+    log_warn "$(T "FORCE_ARCH=1 detected — proceeding with unsupported architecture" "FORCE_ARCH=1 terdeteksi — melanjutkan dengan arsitektur yang tidak didukung" "检测到 FORCE_ARCH=1 — 继续使用不受支持的架构")"
+  fi
+  
+  # 3. Virtualization type
+  log_info "$(T "[3/5] Detecting virtualization type..." "[3/5] Mendeteksi tipe virtualisasi..." "[3/5] 正在检测虚拟化类型...")"
+  check_virtualization || true  # Don't fail on unknown virt
+  
+  # 4. TUN/TAP device
+  log_info "$(T "[4/5] Checking TUN/TAP device..." "[4/5] Memeriksa device TUN/TAP..." "[4/5] 正在检查 TUN/TAP 设备...")"
+  check_tun_tap
+  
+  # 5. OS detection
+  log_info "$(T "[5/5] Detecting operating system..." "[5/5] Mendeteksi sistem operasi..." "[5/5] 正在检测操作系统...")"
+  detect_os
+  print_os_info
+  
+  log_success "$(T "Environment check passed! ✓" "Pemeriksaan environment berhasil! ✓" "环境检查通过！✓")"
+  echo ""
+}
+
 require_cmd() {
   local cmd="$1"
   command -v "$cmd" &>/dev/null || die "$(T "Command '$cmd' not found. Run install.sh first." "Perintah '$cmd' tidak ditemukan. Jalankan install.sh dulu." "未找到命令 '$cmd'。请先运行 install.sh。")"
@@ -254,34 +429,6 @@ is_supported_os() {
       return 1
       ;;
   esac
-}
-
-check_os_supported() {
-  detect_os
-  print_os_info
-  if is_supported_os; then
-    log_success "$(T "Distro is officially supported." "Distro didukung resmi." "该发行版为官方支持。")"
-  else
-    log_warn "$(T "Distro $OS_ID $OS_VERSION_ID is not on the tested list." "Distro $OS_ID $OS_VERSION_ID belum masuk daftar teruji." "发行版 $OS_ID $OS_VERSION_ID 不在已测试列表中。")"
-    log_warn "$(T "Family $OS_FAMILY will still be attempted. Continue at your own risk." "Keluarga $OS_FAMILY tetap dicoba. Lanjutkan dengan risiko sendiri." "仍将尝试 $OS_FAMILY 系列。请自行承担风险继续。")"
-    if [[ "${FORCE_OS:-0}" != "1" && "${AUTO_YES:-0}" != "1" ]]; then
-      confirm "$(T "Continue installation anyway? [y/N] " "Tetap lanjutkan instalasi? [y/N] " "仍要继续安装吗？[y/N] ")" || die "$(T "Installation cancelled by user." "Instalasi dibatalkan oleh pengguna." "安装已被用户取消。")"
-    fi
-  fi
-}
-
-check_tun() {
-  if [[ ! -c /dev/net/tun ]]; then
-    die "$(T "/dev/net/tun is not available. Enable TUN in your VPS panel (usually OpenVZ/LXC), then try again." "/dev/net/tun tidak tersedia. Aktifkan TUN di VPS panel (umumnya di OpenVZ/LXC) lalu coba lagi." "/dev/net/tun 不可用。请在 VPS 面板中启用 TUN（通常为 OpenVZ/LXC），然后重试。")"
-  fi
-}
-
-check_virt() {
-  if command -v systemd-detect-virt &>/dev/null; then
-    local v
-    v="$(systemd-detect-virt 2>/dev/null || true)"
-    [[ -n "$v" && "$v" != "none" ]] && log_info "$(T "Virtualization detected: $v" "Virtualisasi terdeteksi: $v" "检测到虚拟化：$v")"
-  fi
 }
 
 # ------------------------------------------------------------------ network

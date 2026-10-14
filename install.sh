@@ -147,22 +147,24 @@ parse_args() {
 main() {
   parse_args "$@"
 
-  # 1. Root access validation
-  need_root
-
-  # 2. Language selection (interactive only; default English).
+  # 1. Language selection (interactive only; default English).
   #    --lang en|id|zh, VPN_LANG env, or saved /etc/vpn/lang wins silently.
   lang_ask
   lang_save
 
   print_banner
 
-  # 3. TUN device check
-  check_tun
-  check_virt
+  # 2. Comprehensive environment check (v4.5: root, CPU arch, virt, TUN/TAP, OS)
+  check_environment
 
-  # 4. OS validation & detection
-  check_os_supported
+  # 3. OS validation (already done in check_environment, but verify support level)
+  if ! is_supported_os; then
+    log_warn "$(T "Distro $OS_ID $OS_VERSION_ID is not on the tested list." "Distro $OS_ID $OS_VERSION_ID belum masuk daftar teruji." "发行版 $OS_ID $OS_VERSION_ID 不在已测试列表中。")"
+    log_warn "$(T "Family $OS_FAMILY will still be attempted. Continue at your own risk." "Keluarga $OS_FAMILY tetap dicoba. Lanjutkan dengan risiko sendiri." "仍将尝试 $OS_FAMILY 系列。请自行承担风险继续。")"
+    if [[ "${FORCE_OS:-0}" != "1" && "${CLI_YES:-0}" != "1" ]]; then
+      confirm "$(T "Continue installation anyway? [y/N] " "Tetap lanjutkan instalasi? [y/N] " "仍要继续安装吗？[y/N] ")" || die "$(T "Installation cancelled by user." "Instalasi dibatalkan oleh pengguna." "安装已被用户取消。")"
+    fi
+  fi
 
   # Check whether WireGuard was already installed
   if [[ -f /etc/wireguard/params && -f /etc/wireguard/wg0.conf ]]; then
