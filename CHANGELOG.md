@@ -3,13 +3,15 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.2. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.4. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.2 (Latest - 14 Oktober 2026)](#v42---xhttp-transport-ultimate-http-stealth) — **XHTTP Transport (Port 80/443)**
+- [v4.4 (Latest - 14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — **Enhanced OS Detection (20+ distros)**
+- [v4.3 (14 Oktober 2026)](#v43---organized-changelog-structure) — Organized Changelog Structure
+- [v4.2 (14 Oktober 2026)](#v42---xhttp-transport-ultimate-http-stealth) — **XHTTP Transport (Port 80/443)**
 - [v4.1 (14 Oktober 2026)](#v41---donation-support) — Donation Support (QRIS)
 - [v4.0 (14 Oktober 2026)](#v40---grpc-support--xray-v261010) — gRPC Support + Xray v26.10.10
 - [v3.3 (13 Oktober 2026)](#v33---telegram-bot-enhancements) — Telegram Bot Enhancements
@@ -20,6 +22,53 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.2. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.4 — Enhanced Distro & Package Manager Detection
+
+**Tanggal**: 14 Oktober 2026  
+**Detail**: [changelogs/v4.0-v4.4.md](changelogs/v4.0-v4.4.md)
+
+### 🔍 Highlight
+
+**Auto-Detection & Auto-Adaptation untuk 20+ Linux Distros**
+
+- ✅ **Auto-detect package manager** — apt/dnf/yum/pacman/zypper/apk/emerge/xbps/nix-env
+- ✅ **Fallback detection** — jika OS tidak dikenali, detect dari command yang ada
+- ✅ **20+ distro support** — Ubuntu, Debian, RHEL, Rocky, Alma, Fedora, Arch, Manjaro, Alpine, Gentoo, Void, SUSE, dll
+- ✅ **Smart adaptation** — auto-pilih package manager yang tepat
+
+### Distro Baru yang Didukung
+
+**Debian Family**: Devuan, MX Linux, Deepin, Parrot OS  
+**RHEL Family**: Scientific, Oracle, EuroLinux, CloudLinux  
+**Arch Family**: Garuda, Artix, CachyOS  
+**SUSE Family**: OpenSUSE Leap/Tumbleweed, SLES  
+**Other**: Gentoo (emerge), Void Linux (xbps), NixOS (nix-env)
+
+### Fallback Mechanism
+
+Jika OS ID tidak dikenali:
+1. Cek `apt-get` → Debian-based
+2. Cek `dnf` → RHEL-based (modern)
+3. Cek `yum` → RHEL-based (legacy)
+4. Cek `pacman` → Arch-based
+5. Cek `zypper` → SUSE-based
+6. Cek `apk` → Alpine
+
+---
+
+## v4.3 — Organized Changelog Structure
+
+**Tanggal**: 14 Oktober 2026
+
+### Highlight
+
+- 📚 **Reorganized changelogs** ke folder `changelogs/`
+- 📖 **Master CHANGELOG.md** dengan complete version history
+- 📊 **Protocol evolution table** (5 → 13 protocols)
+- 🎯 **Quick navigation** untuk semua versions
 
 ---
 
@@ -220,7 +269,9 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.2. Detail lengkap setiap v
 | v3.1-3.3 | 6 | (Features enhancement) |
 | v4.0 | 9 | + 4 gRPC (VMess/VLESS/Trojan/REALITY) |
 | v4.1 | 9 | (Donation support, no new protocols) |
-| **v4.2** | **13** | **+ 4 XHTTP (VMess/VLESS/Trojan/REALITY)** 🏆 |
+| v4.2 | 13 | + 4 XHTTP (VMess/VLESS/Trojan/REALITY) 🏆 |
+| v4.3 | 13 | (Changelog organization, no new protocols) |
+| **v4.4** | **13** | **(Enhanced OS detection: 20+ distros)** 🔍 |
 
 ---
 
@@ -266,4 +317,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.2 (XHTTP Transport + 13 Protocols Total)
+**Dibuat oleh wrwb Store** — v4.4 (Enhanced OS Detection + XHTTP Transport + 13 Protocols Total)

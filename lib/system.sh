@@ -151,6 +151,26 @@ install_wireguard_packages() {
       zypper install -y wireguard-tools iptables qrencode curl iproute2 openssl ca-certificates
       ;;
 
+    emerge)
+      # Gentoo
+      log_info "$(T "Gentoo detected: syncing portage..." "Gentoo terdeteksi: sync portage..." "检测到 Gentoo：正在同步 portage...")"
+      emerge --sync || true
+      emerge -q net-vpn/wireguard-tools net-firewall/iptables media-gfx/qrencode net-misc/curl sys-apps/iproute2 dev-libs/openssl
+      ;;
+
+    xbps-install)
+      # Void Linux
+      log_info "$(T "Void Linux detected: updating xbps..." "Void Linux terdeteksi: update xbps..." "检测到 Void Linux：正在更新 xbps...")"
+      xbps-install -Syu || true
+      xbps-install -y wireguard-tools iptables qrencode curl iproute2 openssl ca-certificates
+      ;;
+
+    nix-env)
+      # NixOS
+      log_warn "$(T "NixOS requires declarative configuration. Add wireguard-tools to systemPackages in configuration.nix" "NixOS butuh konfigurasi deklaratif. Tambahkan wireguard-tools ke systemPackages di configuration.nix" "NixOS 需要声明式配置。请将 wireguard-tools 添加到 configuration.nix 的 systemPackages")"
+      nix-env -iA nixos.wireguard-tools nixos.iptables nixos.qrencode nixos.curl nixos.iproute2 nixos.openssl || true
+      ;;
+
     *)
       die "$(T "Package manager '$PKG_MGR' is not supported for automatic install. Install wireguard-tools, iptables, qrencode manually." "Package manager '$PKG_MGR' tidak didukung untuk instalasi otomatis. Pasang wireguard-tools, iptables, qrencode secara manual." "软件包管理器 '$PKG_MGR' 不支持自动安装。请手动安装 wireguard-tools、iptables、qrencode。")"
       ;;

@@ -87,32 +87,103 @@ detect_os() {
     OS_MAJOR="$(echo "$OS_VERSION_ID" | cut -d. -f1)"
   fi
 
+  # Enhanced distro detection with auto-adaptation (v4.4)
   case "$OS_ID" in
-    ubuntu|debian|linuxmint|pop|elementary|zorin|kali|raspbian|armbian)
+    # Debian family
+    ubuntu|debian|linuxmint|pop|elementary|zorin|kali|raspbian|armbian|devuan|mx|deepin|parrot)
       OS_FAMILY="debian"
       PKG_MGR="apt"
       FIREWALL_TOOL="ufw"
       ;;
-    centos|rocky|almalinux|rhel|redhat|fedora|ol|amzn)
+    # RHEL family
+    centos|rocky|almalinux|rhel|redhat|fedora|ol|amzn|scientific|oracle|eurolinux|cloudlinux)
       OS_FAMILY="rhel"
       PKG_MGR="dnf"
       FIREWALL_TOOL="firewalld"
-      command -v dnf &>/dev/null || PKG_MGR="yum"
+      # Auto-detect yum for older systems
+      if ! command -v dnf &>/dev/null && command -v yum &>/dev/null; then
+        PKG_MGR="yum"
+      fi
+      # Fedora 40+ check
+      if [[ "$OS_ID" == "fedora" && "$OS_MAJOR" -ge 40 ]]; then
+        log_info "$(T "Fedora $OS_MAJOR detected with DNF5" "Fedora $OS_MAJOR terdeteksi dengan DNF5" "检测到 Fedora $OS_MAJOR 使用 DNF5")"
+      fi
       ;;
-    arch|manjaro|endeavouros)
+    # Arch family
+    arch|manjaro|endeavouros|garuda|artix|cachyos)
       OS_FAMILY="arch"
       PKG_MGR="pacman"
       FIREWALL_TOOL="iptables"
       ;;
-    opensuse*|sles)
+    # SUSE family
+    opensuse*|sles|sled|opensuse-leap|opensuse-tumbleweed)
       OS_FAMILY="suse"
       PKG_MGR="zypper"
       FIREWALL_TOOL="firewalld"
       ;;
+    # Alpine
     alpine)
       OS_FAMILY="alpine"
       PKG_MGR="apk"
       FIREWALL_TOOL="iptables"
+      ;;
+    # Gentoo
+    gentoo)
+      OS_FAMILY="gentoo"
+      PKG_MGR="emerge"
+      FIREWALL_TOOL="iptables"
+      ;;
+    # Void Linux
+    void)
+      OS_FAMILY="void"
+      PKG_MGR="xbps-install"
+      FIREWALL_TOOL="iptables"
+      ;;
+    # NixOS
+    nixos)
+      OS_FAMILY="nixos"
+      PKG_MGR="nix-env"
+      FIREWALL_TOOL="iptables"
+      log_warn "$(T "NixOS detected: manual configuration may be needed." "NixOS terdeteksi: mungkin perlu konfigurasi manual." "检测到 NixOS：可能需要手动配置。")"
+      ;;
+    # Fallback: try to detect by available commands
+    *)
+      log_warn "$(T "OS ID '$OS_ID' not recognized, attempting auto-detection..." "OS ID '$OS_ID' tidak dikenali, mencoba auto-detect..." "OS ID '$OS_ID' 未识别，尝试自动检测...")"
+      if command -v apt-get &>/dev/null; then
+        OS_FAMILY="debian"
+        PKG_MGR="apt"
+        FIREWALL_TOOL="ufw"
+        log_info "$(T "Auto-detected: Debian-based (apt)" "Auto-detect: Debian-based (apt)" "自动检测：基于 Debian（apt）")"
+      elif command -v dnf &>/dev/null; then
+        OS_FAMILY="rhel"
+        PKG_MGR="dnf"
+        FIREWALL_TOOL="firewalld"
+        log_info "$(T "Auto-detected: RHEL-based (dnf)" "Auto-detect: RHEL-based (dnf)" "自动检测：基于 RHEL（dnf）")"
+      elif command -v yum &>/dev/null; then
+        OS_FAMILY="rhel"
+        PKG_MGR="yum"
+        FIREWALL_TOOL="firewalld"
+        log_info "$(T "Auto-detected: RHEL-based (yum)" "Auto-detect: RHEL-based (yum)" "自动检测：基于 RHEL（yum）")"
+      elif command -v pacman &>/dev/null; then
+        OS_FAMILY="arch"
+        PKG_MGR="pacman"
+        FIREWALL_TOOL="iptables"
+        log_info "$(T "Auto-detected: Arch-based (pacman)" "Auto-detect: Arch-based (pacman)" "自动检测：基于 Arch（pacman）")"
+      elif command -v zypper &>/dev/null; then
+        OS_FAMILY="suse"
+        PKG_MGR="zypper"
+        FIREWALL_TOOL="firewalld"
+        log_info "$(T "Auto-detected: SUSE-based (zypper)" "Auto-detect: SUSE-based (zypper)" "自动检测：基于 SUSE（zypper）")"
+      elif command -v apk &>/dev/null; then
+        OS_FAMILY="alpine"
+        PKG_MGR="apk"
+        FIREWALL_TOOL="iptables"
+        log_info "$(T "Auto-detected: Alpine (apk)" "Auto-detect: Alpine (apk)" "自动检测：Alpine（apk）")"
+      else
+        OS_FAMILY="unknown"
+        PKG_MGR="unknown"
+        log_error "$(T "Could not detect package manager. Supported: apt, dnf, yum, pacman, zypper, apk" "Tidak bisa mendeteksi package manager. Didukung: apt, dnf, yum, pacman, zypper, apk" "无法检测软件包管理器。支持：apt、dnf、yum、pacman、zypper、apk")"
+      fi
       ;;
   esac
 
@@ -122,6 +193,11 @@ detect_os() {
 print_os_info() {
   log_info "$(T "Detected OS : $OS_NAME (id=$OS_ID ver=$OS_VERSION_ID family=$OS_FAMILY)" "OS terdeteksi : $OS_NAME (id=$OS_ID ver=$OS_VERSION_ID family=$OS_FAMILY)" "检测到系统：$OS_NAME（id=$OS_ID 版本=$OS_VERSION_ID 系列=$OS_FAMILY）")"
   log_info "$(T "Package mgr : $PKG_MGR | Firewall tool: $FIREWALL_TOOL" "Package mgr   : $PKG_MGR | Firewall tool: $FIREWALL_TOOL" "软件包管理器：$PKG_MGR | 防火墙工具：$FIREWALL_TOOL")"
+  
+  # Show kernel version for compatibility info
+  local kernel_ver
+  kernel_ver="$(uname -r 2>/dev/null || echo "unknown")"
+  log_info "$(T "Kernel ver  : $kernel_ver" "Versi kernel  : $kernel_ver" "内核版本：$kernel_ver")"
 }
 
 # Returns 0 when the OS is officially supported, 1 when untested (but known family)
@@ -135,20 +211,48 @@ is_supported_os() {
       ;;
     debian)
       case "$OS_MAJOR" in
-        10|11|12|13) return 0 ;;
+        10|11|12|13|14) return 0 ;;
         *) return 1 ;;
       esac
       ;;
     rocky|almalinux|centos|rhel)
       case "$OS_MAJOR" in
-        8|9) return 0 ;;
+        8|9|10) return 0 ;;
         *) return 1 ;;
       esac
       ;;
     fedora)
-      return 0 ;;
+      case "$OS_MAJOR" in
+        3[8-9]|4[0-9]|5[0-9]) return 0 ;;  # Fedora 38-59
+        *) return 1 ;;
+      esac
+      ;;
+    arch|manjaro|endeavouros|garuda)
+      # Arch is rolling, always attempt
+      return 0
+      ;;
+    alpine)
+      case "$OS_MAJOR" in
+        3) return 0 ;;  # Alpine 3.x
+        *) return 1 ;;
+      esac
+      ;;
+    linuxmint|pop|elementary|zorin|kali|raspbian|armbian)
+      # Debian-derived, generally compatible
+      return 0
+      ;;
+    opensuse-leap|opensuse-tumbleweed|sles)
+      # SUSE family
+      return 0
+      ;;
     *)
-      return 1 ;;
+      # Unknown distro, but if we detected a family, give it a chance
+      if [[ "$OS_FAMILY" != "unknown" && "$PKG_MGR" != "unknown" ]]; then
+        log_warn "$(T "Distro '$OS_ID' is untested but family '$OS_FAMILY' is recognized." "Distro '$OS_ID' belum diuji tapi keluarga '$OS_FAMILY' dikenali." "发行版 '$OS_ID' 未测试，但识别到系列 '$OS_FAMILY'。")"
+        return 1
+      fi
+      return 1
+      ;;
   esac
 }
 
