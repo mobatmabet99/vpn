@@ -171,7 +171,7 @@ main_loop() {
         pause
         ;;
       7)
-        ssh_setup_server "$(get_public_ip)" 22 143 444 80
+        ssh_setup_server "$(get_public_ip)" 22 143 444 8080
         read -rp "$(T "Create the first SSH account now? [Y/n]: " "Buat akun SSH pertama sekarang? [Y/n]: " "现在创建首个 SSH 账号吗？[Y/n]：")" make_ssh_u
         if [[ ! "${make_ssh_u:-Y}" =~ ^[Nn]$ ]]; then
           read -rp "$(T "Username: " "Username: " "用户名：")" ssh_uname

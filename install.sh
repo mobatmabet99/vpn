@@ -245,7 +245,7 @@ main() {
     # Tunnel engine options — Xray default, V2Ray alternative
     echo ""
     echo "$(T "Choose the tunnel engine (VMess/VLESS/Trojan + XTLS/REALITY):" "Pilih engine tunnel (VMess/VLESS/Trojan + XTLS/REALITY):" "选择隧道引擎 (VMess/VLESS/Trojan + XTLS/REALITY)：")"
-    echo "  1) Xray-core v26.10.10 — $(T "DEFAULT, fastest XTLS-Vision + REALITY + gRPC (9 inbounds)" "DEFAULT, XTLS-Vision + REALITY + gRPC tercepat (9 inbound)" "默认，最快的 XTLS-Vision + REALITY + gRPC（9 个入站）")"
+    echo "  1) Xray-core v26.10.10 — $(T "DEFAULT, fastest XTLS-Vision + REALITY + gRPC + XHTTP (13 inbounds)" "DEFAULT, XTLS-Vision + REALITY + gRPC + XHTTP tercepat (13 inbound)" "默认，最快的 XTLS-Vision + REALITY + gRPC + XHTTP（13 个入站）")"
     echo "  2) v2ray-core v5.53.0 — $(T "stable alternative" "alternatif stabil" "稳定的替代方案")"
     echo "  3) $(T "Install neither" "Tidak pasang keduanya" "都不安装")"
     read -rp "$(T "Choose tunnel engine [1-3] (default 1): " "Pilih engine tunnel [1-3] (default 1): " "选择隧道引擎 [1-3]（默认 1）：")" engine_choice
@@ -303,7 +303,7 @@ main() {
   # 15. Install extra protocols as chosen (default: SSH + Xray)
   if [[ "$WITH_SSH" -eq 1 ]]; then
     log_step "$(T "Installing SSH VPN server (default)..." "Memasang SSH VPN Server (default)..." "正在安装 SSH VPN 服务器（默认）……")"
-    ssh_setup_server "$SERVER_PUB_IP" 22 143 444 80
+    ssh_setup_server "$SERVER_PUB_IP" 22 143 444 8080
   fi
 
   if [[ "$WITH_OPENVPN" -eq 1 ]]; then
@@ -314,7 +314,7 @@ main() {
   fi
 
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    log_step "$(T "Installing ${XRAY_ENGINE} v4 server (9 inbounds: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4 Server (9 inbound: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4 服务器 (9 个入站: VMess/VLESS/Trojan WS + gRPC + XTLS/REALITY)……")"
+    log_step "$(T "Installing ${XRAY_ENGINE} v4.2 server (13 inbounds: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4.2 Server (13 inbound: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4.2 服务器 (13 个入站: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)……")"
     xray_setup_server "$SERVER_PUB_IP"
   fi
 
@@ -355,7 +355,7 @@ main() {
     echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "SSH 账号：sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    echo "  - $(T "Xray/V2Ray v4 users (9 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4 (9 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4 用户（9 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    echo "  - $(T "Xray/V2Ray v4.2 users (13 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4.2 (13 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4.2 用户（13 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
   fi
   echo ""
 }

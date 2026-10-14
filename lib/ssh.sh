@@ -5,7 +5,7 @@
 #
 # SSH is the second default tunneling protocol after WireGuard:
 #   - Easy with any client (OpenSSH client, Termius, etc.)
-#   - Supports direct SSH (port 22/tcp) and SSH over WebSocket (port 80/443)
+#   - Supports direct SSH (port 22/tcp) and SSH over WebSocket (port 8080/443 since v4.2)
 #   - User management via add-ssh-user.sh / remove-ssh-user.sh
 #
 
@@ -195,10 +195,10 @@ EOF
   log_success "$(T "Stunnel active: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel 运行中：端口 $ssl_port（TLS）-> SSH $ssh_port。")"
 }
 
-# WebSocket bridge: forwards WS (port 80) to local SSH (port 22).
+# WebSocket bridge: forwards WS (port 8080 default since v4.2) to local SSH (port 22).
 # Used by tunneling apps (HTTP Custom, etc.) with a standard WS payload.
 ssh_setup_websocket() {
-  local ws_port="${1:-80}"
+  local ws_port="${1:-8080}"
   local ssh_port="${2:-22}"
   log_step "$(T "Installing the SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..." "Memasang SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..." "正在安装 SSH WebSocket 桥接（端口 $ws_port -> 127.0.0.1:$ssh_port）...")"
 
@@ -306,7 +306,7 @@ ssh_setup_server() {
   local ssh_port="${2:-22}"
   local dropbear_port="${3:-143}"
   local ssl_port="${4:-444}"
-  local ws_port="${5:-80}"
+  local ws_port="${5:-8080}"
 
   install_ssh_packages
   ssh_harden_config

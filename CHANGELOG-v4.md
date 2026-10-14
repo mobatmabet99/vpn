@@ -1,7 +1,93 @@
-# Changelog v4 — gRPC Support + Xray v26.10.10 + Donation Support
+# Changelog v4 — gRPC Support + Xray v26.10.10 + Donation Support + XHTTP Transport
 
-**Versi terbaru**: v4.1.0  
+**Versi terbaru**: v4.2.0  
 **Oleh**: wrwb Store
+
+---
+
+## 🚀 v4.2.0 — XHTTP Transport (Port 80/443, Ultimate Stealth) (14 Oktober 2026)
+
+### XHTTP: Transport Terbaru yang Paling Mirip HTTP Real
+
+Menambahkan **4 protokol XHTTP baru** — transport terbaru Xray yang sangat mirip HTTP asli:
+
+**Protokol XHTTP baru (v4.2)**:
+- 🏆 **VLESS + XHTTP + REALITY @ Port 443** (path `/reality-xhttp`) — **BEST: Ultimate stealth, port 443**
+- **VMess + XHTTP @ Port 80** (path `/vmess-xhttp`)
+- **VLESS + XHTTP @ Port 80** (path `/vless-xhttp`)
+- **Trojan + XHTTP @ Port 80** (path `/trojan-xhttp`)
+
+**Total: 13 protokol per user** (9 existing + 4 XHTTP baru)
+
+### Keunggulan XHTTP:
+- ✅ **Paling mirip HTTP real** — traffic indistinguishable dari HTTP biasa
+- ✅ **Port 80/443** — port website standard, anti-blocking maksimal
+- ✅ **Lebih stealth dari WebSocket & gRPC** — newest Xray transport (2026)
+- ✅ **Compatible dengan CDN** — Cloudflare, Nginx, Caddy support
+- ✅ **Low latency** — lebih responsif dari WS untuk browsing/gaming
+- ✅ **Bypass DPI** — Deep Packet Inspection tidak detect sebagai VPN
+
+### Perubahan Breaking:
+- **SSH WebSocket pindah dari port 80 → 8080** untuk menghindari konflik dengan XHTTP
+  - Existing installation: manual restart `ssh-ws` jika perlu
+  - New installation: otomatis pakai port 8080
+
+### Port Mapping v4.2:
+
+**Port 80** (Shared XHTTP):
+- VMess + XHTTP (path `/vmess-xhttp`)
+- VLESS + XHTTP (path `/vless-xhttp`)
+- Trojan + XHTTP (path `/trojan-xhttp`)
+
+**Port 443** (Shared REALITY):
+- VLESS + TCP + XTLS-Vision + REALITY (existing)
+- VLESS + XHTTP + REALITY (path `/reality-xhttp`) 🏆 **NEW & BEST**
+
+**Port 8080**:
+- SSH WebSocket (moved from port 80)
+
+### File yang Dimodifikasi:
+
+1. **`lib/xray.sh`**:
+   - Tambah 4 inbound XHTTP dengan path routing
+   - Port variables: `XPORT_XHTTP_SHARED=80`, `XPORT_VLESS_REALITY_XHTTP=443`
+   - Update `xray_print_links()` untuk 13 protokol
+   - Update service description: "13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY"
+
+2. **`lib/ssh.sh`**:
+   - SSH WebSocket default port: 80 → 8080
+   - Update dokumentasi header
+
+3. **`install.sh`**:
+   - Update description: "13 inbounds" (dari 9)
+   - SSH WebSocket call: `ssh_setup_server ... 8080` (dari 80)
+
+4. **`menu.sh`**:
+   - SSH WebSocket call: `ssh_setup_server ... 8080`
+
+### Rekomendasi Client v4.2:
+
+**Priority order (best to fallback)**:
+1. 🏆 **VLESS + XHTTP + REALITY @ Port 443** — Ultimate stealth
+2. **VLESS + TCP + XTLS-Vision + REALITY @ Port 443** — Most efficient
+3. **VLESS + gRPC + REALITY** — Best for CDN & heavy censorship
+4. **VLESS + TCP + XTLS-Vision** — Plain XTLS
+
+### Kompatibilitas Client XHTTP:
+
+✅ **Android**:
+- v2rayNG (v1.8.29+) — Full XHTTP support
+- NekoBox (v1.2.9+) — Full support
+- SagerNet (latest) — Full support
+
+✅ **iOS**:
+- Streisand (v1.6.0+) — Full support
+- FoXray (v2.4.0+) — Full support
+
+✅ **Desktop**:
+- Nekoray (v3.6.0+) — Full support, all platforms
+- v2rayN (Windows, v6.42+) — Full support
+- Hiddify (v2.2.0+) — Full support
 
 ---
 

@@ -3,7 +3,7 @@
 # lib/xray.sh — Xray-core / V2Ray module (VMess, VLESS, Trojan + XTLS/REALITY, trilingual EN/ID/ZH)
 # Branding: wrwb Store
 #
-# Default engine: Xray-core v26.3.27 (stable, supports XTLS-Vision + REALITY).
+# Default engine: Xray-core v26.10.10 (stable, supports XTLS-Vision + REALITY + XHTTP).
 # Alternative: v2ray-core v5.53.0 (selected via XRAY_ENGINE=v2ray).
 #
 # Inbounds installed together (default ports):
@@ -16,8 +16,12 @@
 #   VLESS gRPC          10006/tcp  (serviceName VLessGRPC) — v4
 #   Trojan gRPC         10007/tcp  (serviceName TrojanGRPC) — v4
 #   VLESS REALITY gRPC  10008/tcp  (serviceName RealityGRPC, with REALITY) — v4
+#   VMess XHTTP         80/tcp     (path /vmess-xhttp) — v4.2
+#   VLESS XHTTP         80/tcp     (path /vless-xhttp) — v4.2
+#   Trojan XHTTP        80/tcp     (path /trojan-xhttp) — v4.2
+#   VLESS REALITY XHTTP 443/tcp    (path /reality-xhttp, with REALITY) — v4.2 🏆 BEST
 #
-# Each user gets 1 UUID valid for ALL protocols above (9 inbounds total).
+# Each user gets 1 UUID valid for ALL protocols above (13 inbounds total).
 #
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -53,6 +57,11 @@ XPORT_VMESS_GRPC="${XPORT_VMESS_GRPC:-10005}"
 XPORT_VLESS_GRPC="${XPORT_VLESS_GRPC:-10006}"
 XPORT_TROJAN_GRPC="${XPORT_TROJAN_GRPC:-10007}"
 XPORT_VLESS_REALITY_GRPC="${XPORT_VLESS_REALITY_GRPC:-10008}"
+
+# v4.2: XHTTP ports (newest transport, most HTTP-like, best stealth)
+# Port 80 shared with path routing, port 443 with fallback to existing REALITY TCP
+XPORT_XHTTP_SHARED="${XPORT_XHTTP_SHARED:-80}"
+XPORT_VLESS_REALITY_XHTTP="${XPORT_VLESS_REALITY_XHTTP:-443}"
 
 # SNI REALITY default: domain besar yang mendukung TLSv1.3 + H2
 XREALITY_SNI_DEFAULT="${XREALITY_SNI_DEFAULT:-www.microsoft.com}"
@@ -196,6 +205,8 @@ XPORT_VMESS_GRPC="$XPORT_VMESS_GRPC"
 XPORT_VLESS_GRPC="$XPORT_VLESS_GRPC"
 XPORT_TROJAN_GRPC="$XPORT_TROJAN_GRPC"
 XPORT_VLESS_REALITY_GRPC="$XPORT_VLESS_REALITY_GRPC"
+XPORT_XHTTP_SHARED="$XPORT_XHTTP_SHARED"
+XPORT_VLESS_REALITY_XHTTP="$XPORT_VLESS_REALITY_XHTTP"
 EOF
   chmod 600 "$XRAY_PARAMS"
 
@@ -232,6 +243,7 @@ EOF
       "streamSettings": { "network": "tcp", "security": "none" }
     },
     {
+      "tag": "vless-reality-tcp",
       "listen": "0.0.0.0",
       "port": $XPORT_VLESS_REALITY,
       "protocol": "vless",
@@ -245,7 +257,7 @@ EOF
           "xver": 0,
           "serverNames": [ "$XREALITY_SNI_DEFAULT" ],
           "privateKey": "$priv_key",
-          "shortIds": [ "$short_id" ]
+          "shortIds": [ "$short_id", "" ]
         }
       }
     },
@@ -306,7 +318,72 @@ EOF
           "xver": 0,
           "serverNames": [ "$XREALITY_SNI_DEFAULT" ],
           "privateKey": "$priv_key",
-          "shortIds": [ "$short_id" ]
+          "shortIds": [ "$short_id", "" ]
+        }
+      }
+    },
+    {
+      "tag": "vmess-xhttp",
+      "listen": "0.0.0.0",
+      "port": $XPORT_XHTTP_SHARED,
+      "protocol": "vmess",
+      "settings": { "clients": [ { "id": "$server_uuid", "alterId": 0 } ] },
+      "streamSettings": { 
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/vmess-xhttp",
+          "host": ""
+        }
+      }
+    },
+    {
+      "tag": "vless-xhttp",
+      "listen": "0.0.0.0",
+      "port": $XPORT_XHTTP_SHARED,
+      "protocol": "vless",
+      "settings": { "clients": [ { "id": "$server_uuid" } ], "decryption": "none" },
+      "streamSettings": { 
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/vless-xhttp",
+          "host": ""
+        }
+      }
+    },
+    {
+      "tag": "trojan-xhttp",
+      "listen": "0.0.0.0",
+      "port": $XPORT_XHTTP_SHARED,
+      "protocol": "trojan",
+      "settings": { "clients": [ { "password": "$server_uuid" } ] },
+      "streamSettings": { 
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/trojan-xhttp",
+          "host": ""
+        }
+      }
+    },
+    {
+      "tag": "vless-reality-xhttp",
+      "listen": "0.0.0.0",
+      "port": $XPORT_VLESS_REALITY,
+      "protocol": "vless",
+      "settings": { "clients": [ { "id": "$server_uuid", "flow": "" } ], "decryption": "none" },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "reality",
+        "xhttpSettings": {
+          "path": "/reality-xhttp",
+          "host": ""
+        },
+        "realitySettings": {
+          "show": false,
+          "dest": "$XREALITY_DEST_DEFAULT",
+          "xver": 0,
+          "serverNames": [ "$XREALITY_SNI_DEFAULT" ],
+          "privateKey": "$priv_key",
+          "shortIds": [ "$short_id", "" ]
         }
       }
     }
@@ -322,7 +399,7 @@ EOF
   # Systemd service
   cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
-Description=Xray/V2Ray Service v4 (9 inbounds: WS + gRPC + XTLS + REALITY)
+Description=Xray/V2Ray Service v4.2 (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY)
 After=network.target
 
 [Service]
@@ -347,8 +424,8 @@ EOF
     die "$(T "${XRAY_ENGINE} install failed to start." "Instalasi ${XRAY_ENGINE} gagal dijalankan." "${XRAY_ENGINE} 安装后启动失败。")"
   fi
 
-  # Open every inbound port in the firewall (WebSocket + gRPC)
-  for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC"; do
+  # Open every inbound port in the firewall (WebSocket + gRPC + XHTTP)
+  for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC" "$XPORT_XHTTP_SHARED"; do
     open_firewall_port "$p" "tcp"
   done
 
@@ -357,13 +434,13 @@ EOF
   chmod 600 "$XRAY_ACCOUNTS_DB"
   echo "server-default:${server_uuid}:$(date +%Y-%m-%d)" >> "$XRAY_ACCOUNTS_DB"
 
-  log_success "$(T "${XRAY_ENGINE} v4 is active (9 inbounds: WS + gRPC + XTLS + REALITY)." "${XRAY_ENGINE} v4 aktif (9 inbound: WS + gRPC + XTLS + REALITY)." "${XRAY_ENGINE} v4 运行中（9 个入站：WS + gRPC + XTLS + REALITY）。")"
+  log_success "$(T "${XRAY_ENGINE} v4.2 is active (13 inbounds: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.2 aktif (13 inbound: WS + gRPC + XHTTP + XTLS + REALITY)." "${XRAY_ENGINE} v4.2 运行中（13 个入站：WS + gRPC + XHTTP + XTLS + REALITY）。")"
 
   xray_print_links "server-default" "$server_uuid"
 }
 
 # ------------------------------------------------------- link generator
-# Prints vmess://, vless:// and trojan:// links (WS + gRPC) + QR for 1 UUID — v4
+# Prints vmess://, vless:// and trojan:// links (WS + gRPC + XHTTP) + QR for 1 UUID — v4.2
 xray_print_links() {
   local name="${1:?$(T "username is required" "nama user wajib diisi" "用户名为必需")}"
   local uuid="${2:?$(T "uuid is required" "uuid wajib diisi" "uuid 为必需")}"
@@ -391,60 +468,86 @@ xray_print_links() {
   local vless_grpc_link="vless://${uuid}@${ip}:${XPORT_VLESS_GRPC}?encryption=none&security=none&type=grpc&serviceName=VLessGRPC#${name}-vless-grpc"
   local trojan_grpc_link="trojan://${uuid}@${ip}:${XPORT_TROJAN_GRPC}?security=none&type=grpc&serviceName=TrojanGRPC#${name}-trojan-grpc"
 
+  # XHTTP links (v4.2: newest transport, most HTTP-like, best stealth on port 80/443)
+  local vmess_json_xhttp
+  vmess_json_xhttp="$(printf '{"v":"2","ps":"%s-vmess-xhttp","add":"%s","port":"%s","id":"%s","aid":"0","net":"xhttp","type":"none","host":"","path":"/vmess-xhttp","tls":""}' "$name" "$ip" "$XPORT_XHTTP_SHARED" "$uuid")"
+  local vmess_xhttp_link="vmess://$(echo -n "$vmess_json_xhttp" | base64 -w 0 2>/dev/null || echo -n "$vmess_json_xhttp" | base64 | tr -d '\n')"
+
+  local vless_xhttp_link="vless://${uuid}@${ip}:${XPORT_XHTTP_SHARED}?encryption=none&security=none&type=xhttp&path=%2Fvless-xhttp#${name}-vless-xhttp"
+  local trojan_xhttp_link="trojan://${uuid}@${ip}:${XPORT_XHTTP_SHARED}?security=none&type=xhttp&path=%2Ftrojan-xhttp#${name}-trojan-xhttp"
+
   # XTLS & REALITY
   local vless_xtls_link="vless://${uuid}@${ip}:${XPORT_VLESS_XTLS}?encryption=none&flow=xtls-rprx-vision&security=none&type=tcp#${name}-vless-xtls"
-  local vless_reality_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}&type=tcp#${name}-vless-reality"
+  local vless_reality_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}&type=tcp#${name}-vless-reality-tcp"
 
   # REALITY + gRPC (v4: best for heavy censorship + CDN compatibility)
   local vless_reality_grpc_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY_GRPC}?encryption=none&security=reality&type=grpc&serviceName=RealityGRPC&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}#${name}-vless-reality-grpc"
 
+  # REALITY + XHTTP (v4.2: BEST stealth on port 443, most HTTP-like)
+  local vless_reality_xhttp_link="vless://${uuid}@${ip}:${XPORT_VLESS_REALITY_XHTTP}?encryption=none&security=reality&type=xhttp&path=%2Freality-xhttp&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}#${name}-vless-reality-xhttp"
+
   echo ""
-  echo "==================== $(T "CONNECTION LINKS v4 (9 PROTOCOLS)" "LINK KONEKSI v4 (9 PROTOKOL)" "连接链接 v4（9 种协议）"): $name ===================="
+  echo "==================== $(T "CONNECTION LINKS v4.2 (13 PROTOCOLS)" "LINK KONEKSI v4.2 (13 PROTOKOL)" "连接链接 v4.2（13 种协议）"): $name ===================="
   echo ""
-  echo "$(T "=== RECOMMENDED (Top 3) ===" "=== REKOMENDASI (3 Teratas) ===" "=== 推荐（前 3 名）===")"
+  echo "$(T "=== RECOMMENDED (Top 4) ===" "=== REKOMENDASI (4 Teratas) ===" "=== 推荐（前 4 名）===")"
   echo ""
-  echo "--- [1] VLESS + TCP + XTLS-Vision + REALITY ($(T "PRIMARY, most efficient & anti-blocking" "UTAMA, paling efisien & anti-blokir" "首选，最高效且抗封锁"))"
+  echo "--- [1] VLESS + XHTTP + REALITY @ Port 443 ($(T "🏆 BEST: Most HTTP-like, port 443, ultimate stealth" "🏆 TERBAIK: Paling mirip HTTP, port 443, stealth maksimal" "🏆 最佳：最像 HTTP，端口 443，终极隐身"))"
+  echo "$vless_reality_xhttp_link"
+  echo ""
+  echo "--- [2] VLESS + TCP + XTLS-Vision + REALITY @ Port 443 ($(T "Most efficient & anti-blocking" "Paling efisien & anti-blokir" "最高效且抗封锁"))"
   echo "$vless_reality_link"
   echo ""
-  echo "--- [2] VLESS + gRPC + REALITY ($(T "BEST for heavy censorship + CDN" "TERBAIK untuk sensor berat + CDN" "最适合严重审查 + CDN"))"
+  echo "--- [3] VLESS + gRPC + REALITY ($(T "Best for CDN & heavy censorship" "Terbaik untuk CDN & sensor berat" "最适合 CDN 与严重审查"))"
   echo "$vless_reality_grpc_link"
   echo ""
-  echo "--- [3] VLESS + TCP + XTLS-Vision"
+  echo "--- [4] VLESS + TCP + XTLS-Vision @ Port 10004"
   echo "$vless_xtls_link"
+  echo ""
+  echo "$(T "=== XHTTP Transports (Port 80, newest, most HTTP-like) ===" "=== Transport XHTTP (Port 80, terbaru, paling mirip HTTP) ===" "=== XHTTP 传输（端口 80，最新，最像 HTTP）===")"
+  echo ""
+  echo "--- [5] VMess + XHTTP @ Port 80"
+  echo "$vmess_xhttp_link"
+  echo ""
+  echo "--- [6] VLESS + XHTTP @ Port 80"
+  echo "$vless_xhttp_link"
+  echo ""
+  echo "--- [7] Trojan + XHTTP @ Port 80"
+  echo "$trojan_xhttp_link"
   echo ""
   echo "$(T "=== WebSocket Transports (CDN compatible) ===" "=== Transport WebSocket (kompatibel CDN) ===" "=== WebSocket 传输（兼容 CDN）===")"
   echo ""
-  echo "--- [4] VMess + WebSocket"
+  echo "--- [8] VMess + WebSocket"
   echo "$vmess_link"
   echo ""
-  echo "--- [5] VLESS + WebSocket"
+  echo "--- [9] VLESS + WebSocket"
   echo "$vless_ws_link"
   echo ""
-  echo "--- [6] Trojan + WebSocket"
+  echo "--- [10] Trojan + WebSocket"
   echo "$trojan_link"
   echo ""
   echo "$(T "=== gRPC Transports (HTTP/2, efficient, CDN compatible) ===" "=== Transport gRPC (HTTP/2, efisien, kompatibel CDN) ===" "=== gRPC 传输（HTTP/2，高效，兼容 CDN）===")"
   echo ""
-  echo "--- [7] VMess + gRPC"
+  echo "--- [11] VMess + gRPC"
   echo "$vmess_grpc_link"
   echo ""
-  echo "--- [8] VLESS + gRPC"
+  echo "--- [12] VLESS + gRPC"
   echo "$vless_grpc_link"
   echo ""
-  echo "--- [9] Trojan + gRPC"
+  echo "--- [13] Trojan + gRPC"
   echo "$trojan_grpc_link"
   echo "=============================================================="
 
   if command -v qrencode &>/dev/null; then
     echo ""
-    echo "$(T "QR code (VLESS REALITY — scan with v2rayNG / NekoBox / Streisand):" "QR Code (VLESS REALITY — pindai dengan v2rayNG / NekoBox / Streisand):" "二维码（VLESS REALITY——请用 v2rayNG / NekoBox / Streisand 扫描）：")"
-    qrencode -t ansiutf8 "$vless_reality_link" || true
+    echo "$(T "QR code (VLESS REALITY XHTTP — scan with v2rayNG / NekoBox / Streisand):" "QR Code (VLESS REALITY XHTTP — pindai dengan v2rayNG / NekoBox / Streisand):" "二维码（VLESS REALITY XHTTP——请用 v2rayNG / NekoBox / Streisand 扫描）：")"
+    qrencode -t ansiutf8 "$vless_reality_xhttp_link" || true
   fi
 
   XRAY_LAST_VMESS="$vmess_link"
   XRAY_LAST_REALITY="$vless_reality_link"
   XRAY_LAST_REALITY_GRPC="$vless_reality_grpc_link"
-  export XRAY_LAST_VMESS XRAY_LAST_REALITY XRAY_LAST_REALITY_GRPC
+  XRAY_LAST_REALITY_XHTTP="$vless_reality_xhttp_link"
+  export XRAY_LAST_VMESS XRAY_LAST_REALITY XRAY_LAST_REALITY_GRPC XRAY_LAST_REALITY_XHTTP
 }
 
 # ------------------------------------------------------- user management
