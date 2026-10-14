@@ -16,6 +16,12 @@ source "$SCRIPT_DIR/lib/common.sh"
 source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
 source "$SCRIPT_DIR/lib/ssl.sh"
+# shellcheck source=lib/edge.sh
+source "$SCRIPT_DIR/lib/edge.sh"
+# shellcheck source=lib/wstunnel.sh
+source "$SCRIPT_DIR/lib/wstunnel.sh"
+# shellcheck source=lib/amneziawg.sh
+source "$SCRIPT_DIR/lib/amneziawg.sh"
 
 install_cleanup_trap
 need_root
@@ -27,7 +33,7 @@ echo "$(T "This script will:" "Skrip ini akan:" "此脚本将执行：")"
 echo " 1. $(T "Stop and disable the WireGuard service (wg-quick@wg0)." "Menghentikan dan menonaktifkan service WireGuard (wg-quick@wg0)." "停止并禁用 WireGuard 服务 (wg-quick@wg0)。")"
 echo " 2. $(T "Delete the server config and all WireGuard client files." "Menghapus konfigurasi server dan semua file client WireGuard." "删除服务器配置及所有 WireGuard 客户端文件。")"
 echo " 3. $(T "Remove firewall rules created by these scripts." "Menghapus aturan firewall yang pernah dibuat oleh skrip ini." "删除这些脚本创建的防火墙规则。")"
-echo " 4. $(T "Remove extra services (SSH / OpenVPN / Xray / Shadowsocks if present)." "Menghapus service tambahan (SSH / OpenVPN / Xray / Shadowsocks jika ada)." "删除附加服务（SSH / OpenVPN / Xray / Shadowsocks，如有）。")"
+echo " 4. $(T "Remove extra services (SSH / OpenVPN / Xray / Shadowsocks / v5 gateway+tunnels+AmneziaWG if present)." "Menghapus service tambahan (SSH / OpenVPN / Xray / Shadowsocks / gateway v5+tunnel+AmneziaWG jika ada)." "删除附加服务（SSH / OpenVPN / Xray / Shadowsocks / v5 网关+隧道+AmneziaWG，如有）。")"
 echo "================================================================================"
 
 if [[ "${1:-}" != "-y" && "${1:-}" != "--yes" ]]; then
@@ -95,7 +101,11 @@ if [[ -d /etc/ssh-vpn ]] || systemctl list-unit-files 2>/dev/null | grep -qE "^(
   if [[ -f /etc/ssh-vpn/params ]]; then
     # shellcheck disable=SC1091
     source /etc/ssh-vpn/params
-    close_firewall_ports "tcp" "${DROPBEAR_PORT:-143}" "${SSL_PORT:-444}" "${SSH_PORT:-22}" "${WS_PORT:-8080}"
+    # v5: WS backend moved 8080 -> 10080 (localhost-only). Both were publicly
+    # opened in past releases, so close BOTH: stale rules otherwise survive
+    # upgrades forever. Localhost backends must never be public (see ssh.sh),
+    # but sweeping them here is harmless when no rule exists.
+    close_firewall_ports "tcp" "${DROPBEAR_PORT:-143}" "${SSL_PORT:-444}" "${SSH_PORT:-22}" "${WS_PORT:-10080}" "8080"
   fi
   for svc in dropbear stunnel4 ssh-ws; do
     systemctl stop "$svc" 2>/dev/null || true
@@ -118,10 +128,32 @@ if [[ -d /etc/xray ]] || systemctl list-unit-files 2>/dev/null | grep -q "^xray\
   if [[ -f /etc/xray/params ]]; then
     # shellcheck disable=SC1091
     source /etc/xray/params
-    close_firewall_ports "tcp" "${XPORT_VMESS_WS:-10001}" "${XPORT_VLESS_WS:-10002}" "${XPORT_TROJAN_WS:-10003}" "${XPORT_VLESS_XTLS:-10004}" "${XPORT_VLESS_REALITY:-443}" "${XPORT_VMESS_GRPC:-10005}" "${XPORT_VLESS_GRPC:-10006}" "${XPORT_TROJAN_GRPC:-10007}" "${XPORT_VLESS_REALITY_GRPC:-10008}" "${XPORT_XHTTP_SHARED:-80}"
+    if [[ "${XRAY_ENGINE:-xray}" == "v2ray" ]]; then
+      close_firewall_ports "tcp" "${XPORT_VMESS_WS:-10001}" "${XPORT_VLESS_WS:-10002}" "${XPORT_TROJAN_WS:-10003}" "${XPORT_VLESS_XTLS:-10004}" "${XPORT_VMESS_GRPC:-10005}" "${XPORT_VLESS_GRPC:-10006}" "${XPORT_TROJAN_GRPC:-10007}"
+    else
+      # NOTE: XHTTP backends 10009-10011 are no longer opened publicly since the
+      # localhost-only fix (see lib/xray.sh) — but STALE rules from v4.x/v5-beta
+      # installs may still exist, so keep closing them here (close is harmless
+      # when no rule exists). Same for the legacy shared-port XPORT_XHTTP_SHARED.
+      close_firewall_ports "tcp" "${XPORT_VMESS_WS:-10001}" "${XPORT_VLESS_WS:-10002}" "${XPORT_TROJAN_WS:-10003}" "${XPORT_VLESS_XTLS:-10004}" "${XPORT_VLESS_REALITY:-443}" "${XPORT_VMESS_GRPC:-10005}" "${XPORT_VLESS_GRPC:-10006}" "${XPORT_TROJAN_GRPC:-10007}" "${XPORT_VLESS_REALITY_GRPC:-10008}" "${XPORT_VMESS_XHTTP:-10009}" "${XPORT_VLESS_XHTTP:-10010}" "${XPORT_TROJAN_XHTTP:-10011}" "${XPORT_VLESS_REALITY_XHTTP:-10012}" "${XPORT_XHTTP_SHARED:-80}" "${XPORT_GW_ALT:-8080}" "${XPORT_GW_TLS:-8443}"
+    fi
   fi
   rm -rf /etc/xray /usr/local/bin/xray /usr/local/share/xray
   log_success "$(T "Xray/V2Ray cleaned up." "Xray/V2Ray dibersihkan." "Xray/V2Ray 已清理。")"
+fi
+
+# 7b. v5: clean Nginx WS gateway + wstunnel + AmneziaWG (helpers are idempotent)
+if [[ -f /etc/nginx/conf.d/vpn-ws-gateway.conf || -f /etc/nginx/http.d/vpn-ws-gateway.conf || -f /etc/vpn-script/edge-params ]]; then
+  log_step "$(T "Cleaning up v5 WS gateway (Nginx)..." "Membersihkan gateway WS v5 (Nginx)..." "正在清理 v5 WS 网关 (Nginx)...")"
+  edge_remove || true
+fi
+if [[ -f /etc/wstunnel/params ]] || systemctl list-unit-files 2>/dev/null | grep -q "^wstunnel\\.service"; then
+  log_step "$(T "Cleaning up WireGuard-WS tunnel (wstunnel)..." "Membersihkan tunnel WireGuard-WS (wstunnel)..." "正在清理 WireGuard-WS 隧道 (wstunnel)...")"
+  wstunnel_remove || true
+fi
+if [[ -d /etc/amneziawg ]] || systemctl list-unit-files 2>/dev/null | grep -qE "awg"; then
+  log_step "$(T "Cleaning up AmneziaWG..." "Membersihkan AmneziaWG..." "正在清理 AmneziaWG...")"
+  awg_remove || true
 fi
 
 # 8. Clean sysctl file when present
@@ -151,7 +183,7 @@ if systemctl list-unit-files 2>/dev/null | grep -q "^vpn-limits\\.service"; then
   log_success "$(T "Limit monitor cleaned up." "Monitor limit dibersihkan." "限制监控已清理。")"
 fi
 
-# 8c. Clean SSL certificates (acme.sh, v4.7)
+# 8d. Clean SSL certificates (acme.sh)
 if [[ -d /etc/vpn-ssl || -x /root/.acme.sh/acme.sh ]]; then
   log_step "$(T "Cleaning up SSL certificates..." "Membersihkan sertifikat SSL..." "正在清理 SSL 证书...")"
   ssl_remove || true

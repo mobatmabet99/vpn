@@ -5,7 +5,7 @@
 #
 # SSH is the second default tunneling protocol after WireGuard:
 #   - Easy with any client (OpenSSH client, Termius, etc.)
-#   - Supports direct SSH (port 22/tcp) and SSH over WebSocket (port 8080/443 since v4.2)
+#   - Supports direct SSH (port 22/tcp) and SSH over WebSocket (gateway 80/8080/443/8443, backend 10080)
 #   - User management via add-ssh-user.sh / remove-ssh-user.sh
 #
 
@@ -172,7 +172,7 @@ EOF
 
   cat > /etc/systemd/system/stunnel4.service <<EOF
 [Unit]
-Description=Stunnel TLS Wrapper for SSH v4.9 (auto-start on boot)
+Description=Stunnel TLS Wrapper for SSH v5 (auto-start on boot)
 After=network.target
 
 [Service]
@@ -192,12 +192,14 @@ EOF
   log_success "$(T "Stunnel active: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel 运行中：端口 $ssl_port（TLS）-> SSH $ssh_port。")"
 }
 
-# WebSocket bridge: forwards WS (port 8080 default since v4.2) to local SSH (port 22).
+# WebSocket bridge: localhost backend for v5 Nginx gateway (10080 -> SSH 22).
+# Public access via gateway: ws://IP:80/ssh-ws, ws://IP:8080/ssh-ws (root / kept),
+# wss://IP:8443/ssh-ws and wss://IP:443/ssh-ws (via REALITY fallback).
 # Used by tunneling apps (HTTP Custom, etc.) with a standard WS payload.
 ssh_setup_websocket() {
-  local ws_port="${1:-8080}"
+  local ws_port="${1:-10080}"
   local ssh_port="${2:-22}"
-  log_step "$(T "Installing the SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..." "Memasang SSH WebSocket bridge (port $ws_port -> 127.0.0.1:$ssh_port)..." "正在安装 SSH WebSocket 桥接（端口 $ws_port -> 127.0.0.1:$ssh_port）...")"
+  log_step "$(T "Installing the SSH WebSocket bridge (127.0.0.1:$ws_port -> 127.0.0.1:$ssh_port, via gateway 80/8080/443/8443)..." "Memasang SSH WebSocket bridge (127.0.0.1:$ws_port -> 127.0.0.1:$ssh_port, via gateway 80/8080/443/8443)..." "正在安装 SSH WebSocket 桥接（127.0.0.1:$ws_port -> 127.0.0.1:$ssh_port，经网关 80/8080/443/8443）...")"
 
   local ws_script="/usr/local/bin/ssh-ws.py"
   cat > "$ws_script" <<EOF
@@ -264,7 +266,8 @@ def handle(client):
 def main():
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("0.0.0.0", LISTEN_PORT))
+    # v5: localhost-only backend (public via Nginx gateway 80/8080/443/8443)
+    srv.bind(("127.0.0.1", LISTEN_PORT))
     srv.listen(128)
     while True:
         client, _ = srv.accept()
@@ -277,7 +280,7 @@ EOF
 
   cat > /etc/systemd/system/ssh-ws.service <<EOF
 [Unit]
-Description=SSH over WebSocket Bridge v4.9 (auto-start on boot)
+Description=SSH over WebSocket Bridge v5 (auto-start on boot, localhost backend for gateway)
 After=network.target
 
 [Service]
@@ -293,8 +296,11 @@ EOF
   # v4.9: enable (auto-start on boot) + restart via helper
   svc_restart "ssh-ws"
 
-  open_firewall_port "$ws_port" "tcp" "SSH-WS"
-  log_success "$(T "SSH WebSocket bridge is active on port $ws_port." "SSH WebSocket bridge aktif di port $ws_port." "SSH WebSocket 桥接已在端口 $ws_port 运行。")"
+  # NOTE: backend is localhost-only (public via Nginx 80/8080/443/8443) — do
+  # NOT open $ws_port publicly. Same reason as XHTTP 10009-10011 / wstunnel
+  # 10081 (see lib/xray.sh): opening would add useless ACCEPT rules on every
+  # filtering VPS and mislead audits into thinking the backend is exposed.
+  log_success "$(T "SSH WebSocket bridge active on 127.0.0.1:$ws_port (via gateway 80/8080/443/8443 /ssh-ws)." "SSH WebSocket bridge aktif di 127.0.0.1:$ws_port (via gateway 80/8080/443/8443 /ssh-ws)." "SSH WebSocket 桥接运行于 127.0.0.1:$ws_port（经网关 80/8080/443/8443 /ssh-ws）。")"
 }
 
 ssh_setup_server() {
@@ -302,9 +308,12 @@ ssh_setup_server() {
   local ssh_port="${2:-22}"
   local dropbear_port="${3:-143}"
   local ssl_port="${4:-444}"
-  local ws_port="${5:-8080}"
+  # v5: WS backend is localhost-only (gateway exposes 80/8080/443/8443).
+  # $5 kept for backward compat (old callers passed 8080) but remapped to 10080.
+  local ws_port="${5:-10080}"
+  if [[ "$ws_port" == "8080" ]]; then ws_port="10080"; fi
 
-  # v4.8: port-conflict check (SSH 22, Dropbear 143, Stunnel 444, WS 8080)
+  # v4.8: port-conflict check (SSH 22, Dropbear 143, Stunnel 444, WS backend 10080)
   check_port_free "$ssh_port" "tcp" "SSH" --soft || true
   check_port_free "$dropbear_port" "tcp" "Dropbear" --soft || true
   check_port_free "$ssl_port" "tcp" "Stunnel" --soft || true
@@ -327,7 +336,7 @@ WS_PORT="$ws_port"
 EOF
   chmod 600 "$SSH_PARAMS"
 
-  log_success "$(T "SSH VPN active — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port" "SSH VPN aktif — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port" "SSH VPN 运行中 — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS:$ws_port")"
+  log_success "$(T "SSH VPN active — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS-via-gateway:80/8080/443/8443" "SSH VPN aktif — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS-via-gateway:80/8080/443/8443" "SSH VPN 运行中 — SSH:$ssh_port Dropbear:$dropbear_port TLS:$ssl_port WS 经网关:80/8080/443/8443")"
 
   echo ""
   echo "==================== $(T "SSH ACCOUNT INFO" "INFORMASI AKUN SSH" "SSH 账户信息") ===================="
@@ -335,7 +344,7 @@ EOF
   echo " $(T "OpenSSH port     : $ssh_port (direct)" "Port OpenSSH     : $ssh_port (direct)" "OpenSSH 端口    ：$ssh_port（直连）")"
   echo " $(T "Dropbear port    : $dropbear_port" "Port Dropbear    : $dropbear_port" "Dropbear 端口   ：$dropbear_port")"
   echo " $(T "SSH over TLS port: $ssl_port (Stunnel)" "Port SSH over TLS: $ssl_port (Stunnel)" "SSH over TLS 端口：$ssl_port（Stunnel）")"
-  echo " $(T "SSH over WS port : $ws_port (WebSocket payload)" "Port SSH over WS : $ws_port (payload WebSocket)" "SSH over WS 端口 ：$ws_port（WebSocket 负载）")"
+  echo " $(T "SSH over WS      : ws://$pub_ip:80/ssh-ws ws://$pub_ip:8080/ssh-ws wss://$pub_ip:8443/ssh-ws wss://$pub_ip:443/ssh-ws (via gateway)" "SSH over WS      : ws://$pub_ip:80/ssh-ws ws://$pub_ip:8080/ssh-ws wss://$pub_ip:8443/ssh-ws wss://$pub_ip:443/ssh-ws (via gateway)" "SSH over WS      ：ws://$pub_ip:80/ssh-ws ws://$pub_ip:8080/ssh-ws wss://$pub_ip:8443/ssh-ws wss://$pub_ip:443/ssh-ws（经网关）")"
   echo " $(T "Create new account: sudo ./add-ssh-user.sh <username>" "Buat akun baru   : sudo ./add-ssh-user.sh <username>" "创建新账户    ：sudo ./add-ssh-user.sh <用户名>")"
   echo "============================================================"
 }
@@ -393,11 +402,12 @@ ssh_create_user() {
   show_and_save "SSH account: $user" <<EOF
 SSH account  : $user
 Host         : ${SSH_PUB_IP:-?}
-Ports        : SSH ${SSH_PORT:-22} | Dropbear ${DROPBEAR_PORT:-143} | TLS ${SSL_PORT:-444} | WS ${WS_PORT:-8080}
+Ports        : SSH ${SSH_PORT:-22} | Dropbear ${DROPBEAR_PORT:-143} | TLS ${SSL_PORT:-444} | WS-via-gateway 80/8080/443/8443 (/ssh-ws)
 Username     : $user
 Password     : $password
 Valid until  : $expire_date
 Connect      : ssh -p ${SSH_PORT:-22} $user@${SSH_PUB_IP:-?}
+WS payload   : ws://${SSH_PUB_IP:-?}:80/ssh-ws | ws://${SSH_PUB_IP:-?}:8080/ssh-ws | wss://${SSH_PUB_IP:-?}:8443/ssh-ws | wss://${SSH_PUB_IP:-?}:443/ssh-ws
 Re-show      : sudo ./show-account.sh $user | cat $VPN_SUMMARY_FILE
 EOF
 

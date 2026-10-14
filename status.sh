@@ -116,13 +116,21 @@ if [[ -f /etc/ssh-vpn/params ]] || systemctl list-unit-files 2>/dev/null | grep 
 fi
 
 # 4c. Xray / V2Ray service status (VMess/VLESS/Trojan + XTLS/REALITY)
+# v5: engine-aware config test (xray `run -test`, v2ray `test -c`).
 if [[ -f /etc/xray/params ]] || systemctl list-unit-files 2>/dev/null | grep -q "^xray\\.service"; then
   echo "--------------------------------------------------------------------------------"
   echo -e "${_C_BOLD}$(T "XRAY/V2RAY SERVICE:" "LAYANAN XRAY/V2RAY:" "XRAY/V2RAY 服务：")${_C_RESET}"
   if systemctl is-active --quiet xray 2>/dev/null; then
     echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_GREEN}[ACTIVE / RUNNING]${_C_RESET} ($(T "enabled: $(systemctl is-enabled xray 2>/dev/null || echo '?') — auto-start on boot" "enabled: $(systemctl is-enabled xray 2>/dev/null || echo '?') — auto-start saat boot" "enabled：$(systemctl is-enabled xray 2>/dev/null || echo '?') — 开机自启"))"
     if [[ -x /usr/local/bin/xray ]]; then
-      echo -e "$(T "Config test           : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'FAIL')" "Tes konfigurasi       : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'GAGAL')" "配置测试              : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo '失败')")"
+      _xray_eng="xray"
+      [[ -f /etc/xray/params ]] && { # shellcheck disable=SC1091
+        source /etc/xray/params 2>/dev/null || true; _xray_eng="${XRAY_ENGINE:-xray}"; }
+      if [[ "$_xray_eng" == "v2ray" ]]; then
+        echo -e "$(T "Config test           : $(/usr/local/bin/xray test -c /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'FAIL')" "Tes konfigurasi       : $(/usr/local/bin/xray test -c /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'GAGAL')" "配置测试              : $(/usr/local/bin/xray test -c /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo '失败')")"
+      else
+        echo -e "$(T "Config test           : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'FAIL')" "Tes konfigurasi       : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo 'GAGAL')" "配置测试              : $(/usr/local/bin/xray run -test -config /etc/xray/config.json >/dev/null 2>&1 && echo 'OK' || echo '失败')")"
+      fi
       echo -e "$(T "Binary version        : $(/usr/local/bin/xray version 2>/dev/null | head -n1)" "Versi Binary          : $(/usr/local/bin/xray version 2>/dev/null | head -n1)" "程序版本              : $(/usr/local/bin/xray version 2>/dev/null | head -n1)")"
     fi
     if [[ -f /etc/xray/params ]]; then
@@ -132,11 +140,60 @@ if [[ -f /etc/xray/params ]] || systemctl list-unit-files 2>/dev/null | grep -q 
       echo -e "$(T "VMess WS port         : ${XPORT_VMESS_WS:-10001}/tcp" "Port VMess WS         : ${XPORT_VMESS_WS:-10001}/tcp" "VMess WS 端口         : ${XPORT_VMESS_WS:-10001}/tcp")"
       echo -e "$(T "VLESS WS port         : ${XPORT_VLESS_WS:-10002}/tcp" "Port VLESS WS         : ${XPORT_VLESS_WS:-10002}/tcp" "VLESS WS 端口         : ${XPORT_VLESS_WS:-10002}/tcp")"
       echo -e "$(T "Trojan WS port        : ${XPORT_TROJAN_WS:-10003}/tcp" "Port Trojan WS        : ${XPORT_TROJAN_WS:-10003}/tcp" "Trojan WS 端口        : ${XPORT_TROJAN_WS:-10003}/tcp")"
-      echo -e "$(T "VLESS XTLS port       : ${XPORT_VLESS_XTLS:-10004}/tcp" "Port VLESS XTLS       : ${XPORT_VLESS_XTLS:-10004}/tcp" "VLESS XTLS 端口       : ${XPORT_VLESS_XTLS:-10004}/tcp")"
-      echo -e "$(T "VLESS REALITY port    : ${XPORT_VLESS_REALITY:-443}/tcp" "Port VLESS REALITY    : ${XPORT_VLESS_REALITY:-443}/tcp" "VLESS REALITY 端口    : ${XPORT_VLESS_REALITY:-443}/tcp")"
+      if [[ "${XRAY_ENGINE:-xray}" == "v2ray" ]]; then
+        echo -e "$(T "VLESS TCP port        : ${XPORT_VLESS_XTLS:-10004}/tcp (plain, no XTLS-Vision)" "Port VLESS TCP        : ${XPORT_VLESS_XTLS:-10004}/tcp (plain, tanpa XTLS-Vision)" "VLESS TCP 端口        : ${XPORT_VLESS_XTLS:-10004}/tcp（明文，无 XTLS-Vision）")"
+        echo -e "$(T "Inbounds              : 7 (WS + gRPC + TCP, no REALITY/XHTTP)" "Inbound               : 7 (WS + gRPC + TCP, tanpa REALITY/XHTTP)" "入站                  : 7（WS + gRPC + TCP，无 REALITY/XHTTP）")"
+      else
+        echo -e "$(T "VLESS XTLS port       : ${XPORT_VLESS_XTLS:-10004}/tcp" "Port VLESS XTLS       : ${XPORT_VLESS_XTLS:-10004}/tcp" "VLESS XTLS 端口       : ${XPORT_VLESS_XTLS:-10004}/tcp")"
+        echo -e "$(T "VLESS REALITY port    : ${XPORT_VLESS_REALITY:-443}/tcp" "Port VLESS REALITY    : ${XPORT_VLESS_REALITY:-443}/tcp" "VLESS REALITY 端口    : ${XPORT_VLESS_REALITY:-443}/tcp")"
+      fi
     fi
   else
     echo -e "$(T "Systemd status        : " "Status Systemd        : " "Systemd 状态          : ")${_C_YELLOW}[INACTIVE]${_C_RESET}"
+  fi
+fi
+
+# 4d. v5 edge: Nginx WS gateway + wstunnel + AmneziaWG health
+if [[ -f /etc/vpn-script/edge-params || -f /etc/nginx/conf.d/vpn-ws-gateway.conf || -f /etc/nginx/http.d/vpn-ws-gateway.conf ]] || systemctl list-unit-files 2>/dev/null | grep -qE "^(nginx|wstunnel)\\.service"; then
+  echo "--------------------------------------------------------------------------------"
+  echo -e "${_C_BOLD}$(T "WS GATEWAY v5 (Nginx edge + tunnels):" "GATEWAY WS v5 (Nginx edge + tunnel):" "v5 WS 网关 (Nginx 边缘 + 隧道)：")${_C_RESET}"
+  for svc in nginx wstunnel; do
+    if systemctl list-unit-files 2>/dev/null | grep -q "^${svc}\\.service"; then
+      _en="$(systemctl is-enabled "$svc" 2>/dev/null || echo '?')"
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        echo -e "  ${svc} : ${_C_GREEN}[ACTIVE]${_C_RESET} (enabled: $_en)"
+      else
+        echo -e "  ${svc} : ${_C_YELLOW}[INACTIVE]${_C_RESET} (enabled: $_en)"
+      fi
+    fi
+  done
+  if command -v nginx &>/dev/null; then
+    echo -e "$(T "Nginx config test      : $(nginx -t >/dev/null 2>&1 && echo 'OK' || echo 'FAIL')" "Tes konfigurasi Nginx   : $(nginx -t >/dev/null 2>&1 && echo 'OK' || echo 'GAGAL')" "Nginx 配置测试        : $(nginx -t >/dev/null 2>&1 && echo 'OK' || echo '失败')")"
+  fi
+  if [[ -f /etc/vpn-script/edge-params ]]; then
+    # shellcheck disable=SC1091
+    source /etc/vpn-script/edge-params
+    echo -e "$(T "Gateway plain ports   : ${EDGE_PORT_PLAIN:-80}/tcp + ${EDGE_PORT_ALT:-8080}/tcp" "Port plain gateway    : ${EDGE_PORT_PLAIN:-80}/tcp + ${EDGE_PORT_ALT:-8080}/tcp" "网关明文端口         : ${EDGE_PORT_PLAIN:-80}/tcp + ${EDGE_PORT_ALT:-8080}/tcp")"
+    echo -e "$(T "Gateway TLS port      : ${EDGE_PORT_TLS:-8443}/tcp (+ 443 via REALITY fallback)" "Port TLS gateway      : ${EDGE_PORT_TLS:-8443}/tcp (+ 443 via fallback REALITY)" "网关 TLS 端口         : ${EDGE_PORT_TLS:-8443}/tcp（+ 经 REALITY 回退的 443）")"
+  fi
+  for svc in "awg-quick@awg0" "awg0"; do
+    # FIXED-PATTERN grep (-F): '@'/'$svc' contains chars ('@' is literal, but
+    # the param expansion already doubles '\' oddly). -F avoids regex vs shell
+    # escaping mismatches (status.sh used a different mangled pattern than
+    # menu.sh — both now use one identical -F string).
+    if systemctl cat "$svc" &>/dev/null || systemctl list-unit-files 2>/dev/null | grep -qF "${svc}.service"; then
+      _en="$(systemctl is-enabled "$svc" 2>/dev/null || echo '?')"
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        echo -e "  ${svc} : ${_C_GREEN}[ACTIVE]${_C_RESET} (enabled: $_en)"
+      else
+        echo -e "  ${svc} : ${_C_YELLOW}[INACTIVE]${_C_RESET} (enabled: $_en)"
+      fi
+    fi
+  done
+  if [[ -f /etc/amneziawg/params ]]; then
+    # shellcheck disable=SC1091
+    source /etc/amneziawg/params 2>/dev/null || true
+    echo -e "$(T "AmneziaWG endpoint    : ${AWG_PUB_IP:-?}:${AWG_PORT:-51821}/udp (awg0)" "Endpoint AmneziaWG    : ${AWG_PUB_IP:-?}:${AWG_PORT:-51821}/udp (awg0)" "AmneziaWG 端点        : ${AWG_PUB_IP:-?}:${AWG_PORT:-51821}/udp (awg0)")"
   fi
 fi
 
@@ -208,9 +265,9 @@ else
   echo -e "$(T "acme.sh               : " "acme.sh               : " "acme.sh               : ")${_C_YELLOW}[NOT INSTALLED]${_C_RESET} ($(T "run menu 24 or ./setup-ssl.sh" "jalankan menu 24 atau ./setup-ssl.sh" "请运行菜单 24 或 ./setup-ssl.sh"))"
 fi
 
-# 8. Saved account summary (v4.9)
+# 8. Saved account summary (v5: /etc/vpn-script/client-config.txt, secrets, mode 600)
 echo "--------------------------------------------------------------------------------"
-echo -e "${_C_BOLD}$(T "SAVED ACCOUNT SUMMARY (v4.9):" "RINGKASAN AKUN TERSIMPAN (v4.9):" "已保存账户摘要 (v4.9)：")${_C_RESET}"
+echo -e "${_C_BOLD}$(T "SAVED ACCOUNT SUMMARY:" "RINGKASAN AKUN TERSIMPAN:" "已保存账户摘要：")${_C_RESET}"
 if [[ -f /etc/vpn-script/client-config.txt ]]; then
   echo "$(T "File                  : /etc/vpn-script/client-config.txt ($(wc -l < /etc/vpn-script/client-config.txt) lines, $(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1))" "File                  : /etc/vpn-script/client-config.txt ($(wc -l < /etc/vpn-script/client-config.txt) baris, $(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1))" "文件                  ：/etc/vpn-script/client-config.txt（$(wc -l < /etc/vpn-script/client-config.txt) 行，$(du -h /etc/vpn-script/client-config.txt 2>/dev/null | cut -f1)）")"
   echo "$(T "Re-show               : sudo ./show-account.sh [user] [--qr] (menu 25)" "Lihat lagi            : sudo ./show-account.sh [user] [--qr] (menu 25)" "再次查看              ：sudo ./show-account.sh [user] [--qr]（菜单 25）")"

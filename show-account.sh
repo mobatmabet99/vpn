@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-#  show-account.sh — Re-display saved account summary (v4.9, trilingual EN/ID/ZH)
+#  show-account.sh — Re-display saved account summary (v5, trilingual EN/ID/ZH)
 #  Usage:
 #    sudo ./show-account.sh [username] [--qr]
 #  Without args: shows the full saved summary (/etc/vpn-script/client-config.txt)
@@ -25,6 +25,8 @@ source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/openvpn.sh"
 # shellcheck source=lib/shadowsocks.sh
 source "$SCRIPT_DIR/lib/shadowsocks.sh"
+# shellcheck source=lib/amneziawg.sh
+source "$SCRIPT_DIR/lib/amneziawg.sh"
 
 install_cleanup_trap
 need_root
@@ -94,7 +96,8 @@ if [[ -f "$SSH_ACCOUNTS_DB" ]] && grep -q "^${USERNAME}:" "$SSH_ACCOUNTS_DB" 2>/
   grep "^${USERNAME}:" "$SSH_ACCOUNTS_DB"
   # shellcheck disable=SC1090
   [[ -f "$SSH_PARAMS" ]] && source "$SSH_PARAMS"
-  echo "$(T "Host: ${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS:${WS_PORT:-8080}" "Host: ${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS:${WS_PORT:-8080}" "主机：${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS:${WS_PORT:-8080}")"
+  # v5: WS backend is localhost-only (10080); users connect via gateway 80/8080/443/8443.
+  echo "$(T "Host: ${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS-backend:127.0.0.1:${WS_PORT:-10080} (via gateway 80/8080/443/8443 /ssh-ws)" "Host: ${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS-backend:127.0.0.1:${WS_PORT:-10080} (via gateway 80/8080/443/8443 /ssh-ws)" "主机：${SSH_PUB_IP:-?} | SSH:${SSH_PORT:-22} Dropbear:${DROPBEAR_PORT:-143} TLS:${SSL_PORT:-444} WS 后端:127.0.0.1:${WS_PORT:-10080}（经网关 80/8080/443/8443 /ssh-ws）")"
   if [[ -f "$SSH_DIR/.last-pass-$USERNAME" ]]; then
     echo "$(T "Password (saved at creation): $(cat "$SSH_DIR/.last-pass-$USERNAME")" "Password (tersimpan saat dibuat): $(cat "$SSH_DIR/.last-pass-$USERNAME")" "密码（创建时保存）：$(cat "$SSH_DIR/.last-pass-$USERNAME")")"
   else
@@ -122,8 +125,22 @@ if [[ -f "$SS_PARAMS" ]]; then
   echo "$(T "Method: ${SS_METHOD:-?} | Port: ${SS_PORT:-8388}" "Metode: ${SS_METHOD:-?} | Port: ${SS_PORT:-8388}" "加密方式：${SS_METHOD:-?} | 端口：${SS_PORT:-8388}")"
 fi
 
+# --- AmneziaWG (v5) ---
+if [[ -f "/etc/amneziawg/clients/${USERNAME}/${USERNAME}.conf" ]]; then
+  FOUND=1
+  echo ""
+  echo "--- AmneziaWG ---"
+  cat "/etc/amneziawg/clients/${USERNAME}/${USERNAME}.conf"
+  if [[ "$WANT_QR" -eq 1 ]]; then
+    wg_show_client_qr "/etc/amneziawg/clients/${USERNAME}/${USERNAME}.conf" || true
+  else
+    echo "$(T "(add --qr to render the QR code)" "(tambah --qr untuk tampilkan QR code)" "（加 --qr 以显示二维码）")"
+    [[ -f "/etc/amneziawg/clients/${USERNAME}/${USERNAME}.png" ]] && echo "$(T "PNG: /etc/amneziawg/clients/${USERNAME}/${USERNAME}.png" "PNG: /etc/amneziawg/clients/${USERNAME}/${USERNAME}.png" "PNG：/etc/amneziawg/clients/${USERNAME}/${USERNAME}.png")"
+  fi
+fi
+
 if [[ "$FOUND" -eq 0 ]]; then
-  log_warn "$(T "No account named '$USERNAME' found (checked WireGuard/Xray/SSH/OpenVPN/Shadowsocks)." "Tidak ada akun '$USERNAME' (sudah cek WireGuard/Xray/SSH/OpenVPN/Shadowsocks)." "未找到账户 '$USERNAME'（已检查 WireGuard/Xray/SSH/OpenVPN/Shadowsocks）。")"
+  log_warn "$(T "No account named '$USERNAME' found (checked WireGuard/Xray/SSH/OpenVPN/Shadowsocks/AmneziaWG)." "Tidak ada akun '$USERNAME' (sudah cek WireGuard/Xray/SSH/OpenVPN/Shadowsocks/AmneziaWG)." "未找到账户 '$USERNAME'（已检查 WireGuard/Xray/SSH/OpenVPN/Shadowsocks/AmneziaWG）。")"
   echo ""
   echo "$(T "Full saved summary:" "Ringkasan tersimpan penuh:" "完整已保存摘要：") $SUMMARY"
 fi

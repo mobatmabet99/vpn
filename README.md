@@ -49,10 +49,11 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | Fitur | Detail |
 |---|---|
 | 🔌 **Protokol utama** | WireGuard (ChaCha20-Poly1305, MTU 1420) dengan auto-generate keypair server + client, Pre-Shared Key (PSK), file `.conf` client & QR Code (PNG + ANSI terminal) |
-| 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket (port 80). Manajemen akun: `add-ssh-user.sh` / `remove-ssh-user.sh` (dengan masa berlaku) |
-| ⚡ **Xray-core v4 (default ON)** | v26.10.10 stabil (Okt 2026) — **9 inbound sekaligus**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis. **gRPC = HTTP/2 based, sangat lancar di Debian 13 & Ubuntu 26, cocok untuk CDN/reverse proxy** |
+| 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket via gateway v5 (`ws://IP:80/ssh-ws`, `ws://IP:8080/ssh-ws`, `wss://IP:8443/ssh-ws`, `wss://IP:443/ssh-ws`; backend localhost 10080). Manajemen akun: `add-ssh-user.sh` / `remove-ssh-user.sh` (dengan masa berlaku) |
+| ⚡ **Xray-core v5 (default ON)** | v26.10.10 stabil (Okt 2026) — **13 inbound sekaligus**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443, fallback → 8443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**, **VMess/VLESS/Trojan XHTTP localhost (10009-10011, via gateway 80/8080/443/8443)**, **VLESS REALITY XHTTP (10012)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis. **gRPC = HTTP/2 based, sangat lancar di Debian 13 & Ubuntu 26, cocok untuk CDN/reverse proxy** |
 | 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
+| 🌐 **Gateway terpadu + WG-WS + AmneziaWG (v5)** | **Nginx WS gateway**: `80/8080` plain + `8443` TLS (acme.sh/self-signed) + `443` via REALITY fallback → Xray WS (10001-10003), XHTTP localhost (10009-10011), SSH-WS (10080), WG-WS (10081). **WireGuard over WebSocket** via wstunnel v11 (`/wg-ws`, WG murni 51820 untouched). **AmneziaWG** anti-DPI interface kedua `awg0:51821/udp` (menu 28/29 + `add/remove-amneziawg-user.sh`) |
 | 🔒 **SSL otomatis (v4.7)** | Sertifikat TLS via **acme.sh** (ringan, tanpa Python berat) — mode **Standalone** (port 80 sementara) atau **DNS API Cloudflare** (tahan CDN/firewall). Auto-renew via cron, tersimpan di `/etc/vpn-ssl/<domain>/` untuk Xray TLS / Stunnel / Nginx. acme.sh **pre-instal default** saat `install.sh` (nonaktifkan via `--no-ssl`) — terbitkan sertifikat via Menu 24 / `./setup-ssl.sh` |
 | 🛡️ **Robustness (v4.8)** | **Strict mode** (`set -euo pipefail` + `|| die`) di semua script, **cek port bentrok** (tampilkan pemilik proses via `ss`/`lsof`, fallback `/proc/net`) untuk SSH/Xray/OpenVPN/Shadowsocks/Web/SSL, dan **auto-cleanup temp** via trap `EXIT/INT/TERM` — gagal tengah jalan tidak tinggalkan sampah. |
 | ⚙️ **Systemd + ringkasan (v4.9)** | **Test-dulu-baru-restart** (`xray run -test` / `sshd -t` wajib lolos sebelum `systemctl restart`) + **auto-start on boot** semua service + kolom `enabled:` di `status.sh`. Setiap akun **dicetak + disimpan** ke `/etc/vpn-script/client-config.txt` (mode 600) + **QR via qrencode** — tampil ulang via `./show-account.sh [user] --qr` (menu 25) |
@@ -60,7 +61,7 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
-| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `show-account.sh` (v4.9), `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-25), `uninstall.sh`, plus library di `lib/` (termasuk `lib/lang.sh`, `lib/limits.sh`) |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `show-account.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `add-amneziawg-user.sh`, `remove-amneziawg-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-29), `uninstall.sh`, plus library di `lib/` (termasuk `lib/lang.sh`, `lib/limits.sh`, `lib/edge.sh`, `lib/wstunnel.sh`, `lib/amneziawg.sh`) |
 | 🌐 **Trilingual (v1.4)** | English default, Indonesia + Mandarin opsional. Satu codebase via `T "English" "Indonesia" "中文"` di `lib/lang.sh`, tersimpan di `/etc/vpn/lang` |
 | ⚠️ **Error handling** | Wajib root/sudo, cek `/dev/net/tun`, deteksi OS + peringatan distro belum teruji, cek port & dependensi, validasi nama client/user, backup konfigurasi lama |
 | ⏱️ **Limit & suspend (v1.2)** | Limit IP concurrent + bandwidth GB/bulan per akun (default 2 IP & 100 GB). Multi-login > limit = auto-suspend 5 menit + auto-clear sesi. Monitor systemd `vpn-limits` tiap 60 detik |
@@ -76,32 +77,36 @@ vpn/
 ├── remove-client.sh        # Hapus client WireGuard (+ bersihkan data limit)
 ├── list-clients.sh         # Daftar client WG + statistik trafik & handshake
 ├── show-qr.sh              # Tampilkan ulang QR Code / .conf client WG
-├── show-account.sh         # (v4.9) Tampilkan ulang ringkasan tersimpan (semua user / 1 user + --qr)
+├── show-account.sh         # Tampilkan ulang ringkasan tersimpan (semua user / 1 user + --qr)
 ├── add-ssh-user.sh         # Buat akun SSH VPN (masa berlaku + limit IP & bandwidth)
 ├── remove-ssh-user.sh      # Hapus akun SSH VPN (+ bersihkan data limit)
 ├── add-xray-user.sh        # Buat user Xray/V2Ray + limit IP & bandwidth
 ├── remove-xray-user.sh     # Hapus user Xray/V2Ray (+ bersihkan data limit)
+├── add-amneziawg-user.sh   # (v5) Buat client AmneziaWG + QR
+├── remove-amneziawg-user.sh # (v5) Hapus client AmneziaWG
 ├── check-limits.sh         # Lihat limit IP, kuota, IP aktif & status suspend
 ├── status.sh               # Diagnostik: service (+enabled/auto-start), forwarding, TUN, NAT, firewall, limit, SSL, ringkasan tersimpan
-├── menu.sh                 # Menu interaktif 0-25 (panel kontrol wrwb Store, termasuk ganti bahasa + show-account)
+├── menu.sh                 # Menu interaktif 0-29 (panel kontrol wrwb Store, termasuk gateway v5 + show-account)
 ├── uninstall.sh            # Hapus bersih seluruh instalasi VPN (+ monitor limit, + /etc/vpn/lang, + /etc/vpn-script)
 ├── README.md               # Dokumentasi Indonesia (file ini)
 ├── README.en.md            # Dokumentasi English (default)
 ├── README.zh.md            # Dokumentasi Mandarin (简体中文)
-├── CHANGELOG-v1.2.md       # Catatan rilis v1.2 (limit IP & bandwidth)
-├── CHANGELOG-v1.3.md       # Catatan rilis v1.3 (bilingual EN/ID)
-├── CHANGELOG-v1.4.md       # Catatan rilis v1.4 (trilingual EN/ID/ZH)
+├── CHANGELOG.md            # Ringkasan rilis v1.2 hingga v5
+├── changelogs/             # Detail tiap versi (v4.0-v4.2.md ... v5.md)
 ├── lib/
 │   ├── lang.sh             # Inti trilingual v1.4: T "EN" "ID" "ZH", /etc/vpn/lang
 │   ├── common.sh           # Logging, deteksi OS, validasi, helper jaringan, params
 │   ├── system.sh           # Instal paket, IP forwarding, firewall (UFW/firewalld)
 │   ├── wireguard.sh        # Inti WireGuard: server conf, alokasi IP, CRUD client
 │   ├── ssh.sh              # Modul SSH: OpenSSH+Dropbear+Stunnel+WebSocket, CRUD akun
-│   ├── xray.sh             # Modul Xray/V2Ray: VMess/VLESS/Trojan+XTLS/REALITY
+│   ├── xray.sh             # Modul Xray/V2Ray: VMess/VLESS/Trojan+XTLS/REALITY+gRPC+XHTTP
 │   ├── limits.sh           # Modul v1.2: limit IP & bandwidth + auto-suspend 5 menit
 │   ├── openvpn.sh          # Modul alternatif OpenVPN + Easy-RSA
-│   └── shadowsocks.sh      # Modul opsional Shadowsocks-rust
-├── README.md
+│   ├── shadowsocks.sh      # Modul opsional Shadowsocks-rust
+│   ├── ssl.sh              # Modul SSL acme.sh + refresh gateway
+│   ├── edge.sh             # (v5) Nginx WS gateway 80/8080/8443 + fallback 443
+│   ├── wstunnel.sh         # (v5) WireGuard-over-WebSocket via wstunnel
+│   └── amneziawg.sh        # (v5) AmneziaWG anti-DPI (awg0:51821)
 └── .gitattributes          # Memaksa LF endings agar skrip aman di Linux
 ```
 
@@ -116,7 +121,7 @@ File konfigurasi yang dihasilkan di server:
     └── private.key / public.key / preshared.key
 /etc/ssh-vpn/params                # Port SSH/Dropbear/TLS/WS + IP publik
 /etc/ssh-vpn/accounts.db           # Database akun SSH (user:dibuat:kedaluwarsa)
-/etc/xray/config.json              # Konfigurasi Xray/V2Ray (5 inbound)
+/etc/xray/config.json              # Konfigurasi Xray/V2Ray (13 inbound xray / 7 inbound v2ray)
 ```
 
 ```
@@ -133,7 +138,7 @@ File konfigurasi yang dihasilkan di server:
 2. **Akses root** — semua skrip harus dijalankan sebagai root / via `sudo`.
 3. **Perangkat TUN** tersedia (`/dev/net/tun`). Hampir semua VPS KVM sudah aktif. Untuk OpenVZ/LXC, aktifkan TUN di panel provider dulu.
 4. **Koneksi internet** di server untuk download paket (apt/dnf) dan binary GitHub (Xray/Shadowsocks).
-5. **Port bebas & terbuka** di firewall cloud provider: UDP 51820 (WireGuard), TCP 22/80/143/444 (SSH), TCP 443/10001-10004 (Xray).
+5. **Port bebas & terbuka** di firewall cloud provider: UDP 51820 (WireGuard), UDP 51821 (AmneziaWG v5), TCP 22/143/444 (SSH), TCP 80/8080/8443 (gateway v5) + TCP 443/10001-10008/10012 (Xray).
 6. **Python 3** di server (umumnya sudah bawaan; dipakai modul Xray untuk edit JSON aman).
 
 ---
@@ -217,14 +222,15 @@ Lihat semua opsi:
 4. Deteksi interface jaringan utama & IP publik server.
 5. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
 6. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
-6. Instal paket WireGuard + aktifkan IP forwarding & optimasi throughput (BBR, buffer TCP).
-7. Buka port UDP WireGuard via firewall dinamis (UFW / firewalld / nftables / iptables).
-8. Generate server keypair, tulis `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), simpan `params`.
-9. Buat client WireGuard pertama + `.conf` + QR Code, lalu enable & start `wg-quick@wg0`.
-10. **Pasang SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + WebSocket:80.
-11. **Pasang Xray-core** (default): 5 inbound VMess/VLESS/Trojan + XTLS-Vision + REALITY:443 + link koneksi & QR.
-12. (Opsional) OpenVPN / Shadowsocks bila diminta.
-13. Tampilkan ringkasan + perintah cepat.
+7. Instal paket WireGuard + aktifkan IP forwarding & optimasi throughput (BBR, buffer TCP).
+8. Buka port UDP WireGuard via firewall dinamis (UFW / firewalld / nftables / iptables).
+9. Generate server keypair, tulis `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), simpan `params`.
+10. Buat client WireGuard pertama + `.conf` + QR Code, lalu enable & start `wg-quick@wg0`.
+11. **Pasang SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + SSH-WS localhost 10080 via gateway v5 (80/8080/8443/443).
+12. **Pasang Xray-core v5** (default): 13 inbound (xray) / 7 inbound (v2ray) — VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS-Vision + REALITY:443 + link koneksi & QR.
+13. **Pasang wstunnel + Nginx gateway + AmneziaWG (v5)**: WG-WS 10081, gateway 80/8080/8443 + fallback 443, AWG `awg0:51821/udp`.
+14. (Opsional) OpenVPN / Shadowsocks bila diminta.
+15. Tampilkan ringkasan + perintah cepat.
 
 ### 4. Alternatif: pakai menu interaktif
 
@@ -233,7 +239,7 @@ sudo ./menu.sh
 sudo ./menu.sh --lang zh   # paksa Bahasa Mandarin untuk sesi ini
 ```
 
-Menu 0–17: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek status, instal SSH / OpenVPN / Xray / V2Ray / Shadowsocks, kelola akun SSH, kelola user Xray, mulai ulang service, cek limit, ganti bahasa (17), uninstall.
+Menu 0-29: instal WG, tambah/hapus client WG, tampil QR, daftar client, cek status, instal SSH / OpenVPN / Xray / V2Ray / Shadowsocks, kelola akun SSH, kelola user Xray, mulai ulang service, cek limit, ganti bahasa (17), uninstall, gateway v5 (26-29), Telegram/Bot/Dashboard/Backup (19-24).
 
 ---
 
@@ -257,7 +263,7 @@ Aturan nama: huruf, angka, `-`, `_` saja, maksimal 32 karakter.
 
 ## 🔑 SSH VPN — Kelola Akun
 
-Layanan default kedua setelah WireGuard. Port: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS **80**.
+Layanan default kedua setelah WireGuard. Port: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS via gateway v5 (`ws://IP:80/ssh-ws`, `ws://IP:8080/ssh-ws`, `wss://IP:8443/ssh-ws`, `wss://IP:443/ssh-ws`).
 
 ```bash
 sudo ./add-ssh-user.sh                    # interaktif (tanya limit IP & bandwidth)
@@ -277,31 +283,57 @@ Untuk aplikasi tunneling (HTTP Custom, dsb.): gunakan host `IP-SERVER`, port WS 
 
 ---
 
-## ⚡ Xray / V2Ray v4 — Kelola User (VMess / VLESS / Trojan + XTLS / REALITY + gRPC)
+## ⚡ Xray / V2Ray v5 — Kelola User (VMess / VLESS / Trojan + XTLS / REALITY + gRPC + XHTTP + Gateway)
 
-Satu user = 1 UUID yang langsung aktif di **semua 9 inbound**:
+Satu user = 1 UUID yang langsung aktif di **semua 13 inbound (engine xray)** atau **7 inbound (engine v2ray)**:
 
 | # | Protokol | Port | Cocok untuk |
 |---|---|---|---|
-| 1 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Utama** — paling efisien & anti-blokir, tanpa domain/TLS sendiri (SNI `www.microsoft.com`) |
-| 2 | **VLESS + gRPC + REALITY** | 10008 | **Terbaik untuk sensor berat + CDN** — HTTP/2, sangat stabil di Debian 13/Ubuntu 26 |
-| 3 | VLESS + TCP + XTLS-Vision | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
-| 4 | VMess + WebSocket (`/vmess`) | 10001 | Kompatibilitas client lama |
-| 5 | VLESS + WebSocket (`/vless`) | 10002 | Balik CDN/reverse-proxy (Cloudflare dsb.) |
-| 6 | Trojan + WebSocket (`/trojan`) | 10003 | Samaran trafik HTTPS |
-| 7 | VMess + gRPC (`VMessGRPC`) | 10005 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
-| 8 | VLESS + gRPC (`VLessGRPC`) | 10006 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
-| 9 | Trojan + gRPC (`TrojanGRPC`) | 10007 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
+| 1 | **VLESS + XHTTP + REALITY** | 10012 | **🏆 TERBAIK** — paling mirip HTTP, stealth maksimal |
+| 2 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Utama** — paling efisien & anti-blokir, tanpa domain/TLS sendiri (SNI `www.microsoft.com`) + fallback WS-TLS → 8443 |
+| 3 | VLESS + gRPC + REALITY | 10008 | **Terbaik untuk sensor berat + CDN** — HTTP/2, sangat stabil di Debian 13/Ubuntu 26 |
+| 4 | VLESS + TCP + XTLS-Vision | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
+| 5-7 | VMess/VLESS/Trojan + XHTTP via gateway | 80/8080/8443/443 | HTTP stealth via Nginx (`/vmess-xhttp`, `/vless-xhttp`, `/trojan-xhttp`) |
+| 8-10 | VMess/VLESS/Trojan + WebSocket | 10001-10003 direct / 80/8080 gateway | Kompatibilitas client lama + balik CDN |
+| 11-13 | VMess/VLESS/Trojan + gRPC | 10005-10007 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
+
+| # | Protokol (engine v2ray — 7 inbound) | Port | Cocok untuk |
+|---|---|---|---|
+| 1 | VLESS + TCP polos | 10004 | Cepat di jaringan bersih / balik TLS terminator sendiri |
+| 2-4 | VMess/VLESS/Trojan + WebSocket (`/vmess` `/vless` `/trojan`) | 10001-10003 | Kompatibilitas client lama + balik CDN |
+| 5-7 | VMess/VLESS/Trojan + gRPC (`VMessGRPC`/`VLessGRPC`/`TrojanGRPC`) | 10005-10007 | HTTP/2, efisien, cocok CDN/Nginx/Caddy |
 
 ```bash
-sudo ./add-xray-user.sh hp-andi       # buat user + cetak 5 link + QR REALITY (limit default)
+sudo ./add-xray-user.sh hp-andi       # buat user + cetak link + QR (limit default)
 sudo ./add-xray-user.sh hp-andi 3 200 # buat user dengan limit 3 IP / 200 GB
 sudo ./remove-xray-user.sh hp-andi    # hapus dari semua inbound
 ```
 
-Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas v4: **VLESS REALITY (TCP) > VLESS REALITY gRPC > VLESS XTLS > VLESS/VMess/Trojan gRPC > WS**. gRPC sangat stabil & cepat, cocok untuk CDN dan reverse proxy.
+Aplikasi client yang disarankan: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Prioritas v5: **VLESS XHTTP+REALITY (10012) > VLESS TCP+REALITY (443) > VLESS gRPC+REALITY (10008) > VLESS XTLS (10004) > XHTTP via gateway > gRPC > WS**. gRPC sangat stabil & cepat, cocok untuk CDN dan reverse proxy.
 
-Ganti engine default (`xray` → `v2ray`) saat instal: `sudo ./install.sh --with-v2ray --yes` atau `XRAY_ENGINE=v2ray sudo ./install.sh --yes`.
+Ganti engine default (`xray` → `v2ray`) saat instal: `sudo ./install.sh --with-v2ray --yes` atau `XRAY_ENGINE=v2ray sudo ./install.sh --yes`. Engine v2ray = 7 inbound (3× WS + 3× gRPC + 1× TCP polos, tanpa REALITY/XHTTP/XTLS-Vision).
+
+---
+
+## 🌐 Gateway v5 — Nginx 80/8080/8443 + 443 Fallback, WG-WS & AmneziaWG
+
+Satu gateway Nginx melayani semua WS/XHTTP tanpa config ganda (menu **26**):
+
+| Port | Sifat | Routing |
+|---|---|---|
+| `80/tcp` | plain non-TLS | `/vmess /vless /trojan` → 10001-10003, `/vmess-xhttp /vless-xhttp /trojan-xhttp` → 10009-10011, `/ssh-ws` → 10080, `/wg-ws` → 10081 |
+| `8080/tcp` | alt plain | routing sama (+ `/` lama untuk klien SSH-WS lawas) |
+| `8443/tcp` | TLS (acme.sh bila ada, kalau tidak self-signed 10 tahun) | routing sama via `wss://` |
+| `443/tcp` | VLESS TCP REALITY + fallback → 8443 | WS-TLS via 443 pakai `security=tls` + SNI gateway (BUKAN pbk/sid REALITY) |
+
+**WireGuard over WebSocket** (menu **27**): `WG client → wstunnel client → WS/WSS (80/8080/443/8443) → Nginx /wg-ws → wstunnel 127.0.0.1:10081 → WG lokal 51820`. WG murni UDP 51820 tidak tersentuh.
+
+**AmneziaWG anti-DPI** (menu **28/29**): interface kedua `awg0:51821/udp` + obfuskasi `Jc/Jmin/Jmax/S1/S2/H1-H4` otomatis:
+
+```bash
+sudo ./add-amneziawg-user.sh hp-awg       # buat client + QR (limit default)
+sudo ./remove-amneziawg-user.sh hp-awg    # hapus client
+```
 
 ---
 
@@ -340,7 +372,7 @@ sudo ./status.sh
 sudo systemctl restart wg-quick@wg0
 sudo wg show   # lihat handshake & transfer per peer
 
-# Ganti bahasa (menu 17)
+# Ganti bahasa (menu 17: Switch language)
 sudo ./menu.sh
 
 # Hapus bersih seluruh VPN dari server (dengan backup darurat di /root/)
@@ -390,7 +422,7 @@ sudo ./uninstall.sh
 - **Ganti subnet VPN:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` di `install.sh` dan `base_v4`/`base_v6` di `lib/wireguard.sh` (pastikan konsisten di `wg_write_server_conf` dan `wg_get_next_ip`).
 - **Ganti DNS default:** edit `DEFAULT_DNS` di `install.sh`.
 - **Ganti bahasa default:** tidak perlu edit kode — gunakan `--lang en|id|zh`, `VPN_LANG=zh`, atau menu 17. File: `/etc/vpn/lang`.
-- **Ganti versi Xray/V2Ray:** edit `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) di `lib/xray.sh` — cek rilis terbaru di [Xray-core releases](https://github.com/XTLS/Xray-core/releases) dan [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
+- **Ganti versi Xray/V2Ray:** edit `XRAY_VERSION_DEFAULT` (`v26.10.10`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) di `lib/xray.sh` — cek rilis terbaru di [Xray-core releases](https://github.com/XTLS/Xray-core/releases) dan [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
 - **Ganti port inbound Xray:** edit `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY` di `lib/xray.sh` sebelum instalasi.
 - **Ganti SNI REALITY:** edit `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` di `lib/xray.sh` (syarat: domain asing, TLSv1.3 + H2, tidak redirect).
 - **Ganti versi Shadowsocks:** edit `SS_VERSION_DEFAULT` di `lib/shadowsocks.sh` (default: `v1.25.0`, cek [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
@@ -427,4 +459,4 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 Bebas digunakan untuk keperluan pribadi maupun komersial. Disediakan "sebagaimana adanya" tanpa garansi. Pastikan kepatuhan terhadap hukum/ToS provider jaringan Anda saat menjalankan layanan VPN.
 
 ---
-Dibuat oleh **wrwb Store** — v1.4 (Trilingual EN/ID/ZH, default English + Limit 2 IP & 100 GB, auto-suspend 5 menit).
+Dibuat oleh **wrwb Store** — v5 (Unified 80/443+8080/8443 gateway + WG-WS + AmneziaWG + Limit 2 IP & 100 GB, auto-suspend 5 menit).

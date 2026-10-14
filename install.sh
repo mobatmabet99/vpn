@@ -45,6 +45,12 @@ source "$SCRIPT_DIR/lib/xray.sh"
 source "$SCRIPT_DIR/lib/limits.sh"
 # shellcheck source=lib/ssl.sh
 source "$SCRIPT_DIR/lib/ssl.sh"
+# shellcheck source=lib/edge.sh
+source "$SCRIPT_DIR/lib/edge.sh"
+# shellcheck source=lib/wstunnel.sh
+source "$SCRIPT_DIR/lib/wstunnel.sh"
+# shellcheck source=lib/amneziawg.sh
+source "$SCRIPT_DIR/lib/amneziawg.sh"
 
 # Default configuration
 DEFAULT_PORT="51820"
@@ -133,7 +139,7 @@ parse_args() {
         echo "      --with-v2ray           $(T "Install v2ray-core (replaces Xray)" "Pasang v2ray-core (pengganti Xray)" "安装 v2ray-core（替代 Xray）")"
         echo "      --no-xray              $(T "Install neither Xray nor V2Ray" "Jangan pasang Xray/V2Ray" "既不安装 Xray 也不安装 V2Ray")"
         echo "      --with-shadowsocks     $(T "Also install Shadowsocks" "Sekaligus instal Shadowsocks" "同时安装 Shadowsocks")"
-      echo "      --with-ssl / --no-ssl      $(T "Pre-install acme.sh SSL client (DEFAULT ON)" "Pre-instal klien SSL acme.sh (DEFAULT AKTIF)" "预安装 acme.sh SSL 客户端（默认开启）")"
+        echo "      --with-ssl / --no-ssl      $(T "Pre-install acme.sh SSL client (DEFAULT ON)" "Pre-instal klien SSL acme.sh (DEFAULT AKTIF)" "预安装 acme.sh SSL 客户端（默认开启）")"
         echo "  -h, --help                 $(T "Show this help" "Tampilkan bantuan ini" "显示此帮助")"
         echo ""
         echo "$(T "Examples:" "Contoh:" "示例：")"
@@ -320,7 +326,7 @@ main() {
   # 15. Install extra protocols as chosen (default: SSH + Xray)
   if [[ "$WITH_SSH" -eq 1 ]]; then
     log_step "$(T "Installing SSH VPN server (default)..." "Memasang SSH VPN Server (default)..." "正在安装 SSH VPN 服务器（默认）……")"
-    ssh_setup_server "$SERVER_PUB_IP" 22 143 444 8080
+    ssh_setup_server "$SERVER_PUB_IP" 22 143 444 10080
   fi
 
   if [[ "$WITH_OPENVPN" -eq 1 ]]; then
@@ -331,13 +337,35 @@ main() {
   fi
 
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    log_step "$(T "Installing ${XRAY_ENGINE} v4.9 server (13 inbounds: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "Memasang ${XRAY_ENGINE} v4.9 Server (13 inbound: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "正在安装 ${XRAY_ENGINE} v4.9 服务器 (13 个入站: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)……")"
+    if [[ "${XRAY_ENGINE:-xray}" == "v2ray" ]]; then
+      log_step "$(T "Installing v2ray v5 server (7 inbounds: WS + gRPC + TCP, no REALITY/XHTTP/XTLS-Vision)..." "Memasang Server v2ray v5 (7 inbound: WS + gRPC + TCP, tanpa REALITY/XHTTP/XTLS-Vision)..." "正在安装 v2ray v5 服务器（7 个入站：WS + gRPC + TCP，无 REALITY/XHTTP/XTLS-Vision）……")"
+    else
+      log_step "$(T "Installing xray v5 server (13 inbounds: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "Memasang Server xray v5 (13 inbound: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)..." "正在安装 xray v5 服务器 (13 个入站: VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS/REALITY)……")"
+    fi
     xray_setup_server "$SERVER_PUB_IP"
   fi
 
   if [[ "$WITH_SHADOWSOCKS" -eq 1 ]]; then
     log_step "$(T "Installing Shadowsocks server..." "Memasang Shadowsocks Server..." "正在安装 Shadowsocks 服务器……")"
     ss_setup_server 8388 "$(gen_password 18)" "$SS_METHOD_DEFAULT" "$SERVER_PUB_IP"
+  fi
+
+  # 15a. v5: WireGuard over WebSocket tunnel FIRST (wstunnel backend must exist
+  # before Nginx gateway references it; pure WG untouched).
+  log_step "$(T "Installing WireGuard-WS tunnel (wstunnel)..." "Memasang tunnel WireGuard-WS (wstunnel)..." "正在安装 WireGuard-WS 隧道 (wstunnel)...")"
+  wstunnel_setup_server "$SERVER_PORT" "$SERVER_PUB_IP" || log_warn "$(T "wstunnel skipped — pure WireGuard still works." "wstunnel dilewati — WireGuard murni tetap jalan." "已跳过 wstunnel — 原生 WireGuard 仍可用。")"
+
+  # 15a2. v5: Nginx WS gateway (80/8080 plain + 8443 TLS, 443 via REALITY fallback).
+  # Needs Xray (WS/XHTTP backends) + SSH-WS + wstunnel backends; runs after them
+  # so first-time gateway never proxies to missing backends.
+  log_step "$(T "Installing v5 WS gateway (Nginx 80/8080/8443)..." "Memasang gateway WS v5 (Nginx 80/8080/8443)..." "正在安装 v5 WS 网关 (Nginx 80/8080/8443)...")"
+  edge_setup_server "$SERVER_PUB_IP" || log_warn "$(T "Nginx gateway skipped — direct ports still work." "Gateway Nginx dilewati — port direct tetap jalan." "已跳过 Nginx 网关 — 直连端口仍可用。")"
+
+  # 15a3. v5: AmneziaWG (second UDP interface awg0:51821, soft-fail when binary unavailable)
+  log_step "$(T "Installing AmneziaWG (DPI-resistant WireGuard)..." "Memasang AmneziaWG (WireGuard anti-DPI)..." "正在安装 AmneziaWG（抗 DPI WireGuard）...")"
+  awg_setup_server "$SERVER_PUB_IP" "${AWG_PORT:-51821}" "$NET_IFACE" || log_warn "$(T "AmneziaWG skipped — pure WireGuard still works." "AmneziaWG dilewati — WireGuard murni tetap jalan." "已跳过 AmneziaWG — 原生 WireGuard 仍可用。")"
+  if [[ -f /etc/amneziawg/params ]]; then
+    awg_create_client "$FIRST_CLIENT" || true
   fi
 
   # 15b. Register default limit for the first client + install monitor (wrwb Store)
@@ -383,8 +411,14 @@ main() {
     echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "SSH 账号：sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi
   if [[ "$WITH_XRAY" -eq 1 ]]; then
-    echo "  - $(T "Xray/V2Ray v4.9 users (13 protocols): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray/V2Ray v4.9 (13 protokol): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray/V2Ray v4.9 用户（13 种协议）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    if [[ "${XRAY_ENGINE:-xray}" == "v2ray" ]]; then
+      echo "  - $(T "v2ray v5 users (7 protocols + gateway): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User v2ray v5 (7 protokol + gateway): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "v2ray v5 用户（7 种协议 + 网关）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    else
+      echo "  - $(T "Xray v5 users (13 protocols + gateway): sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>" "User Xray v5 (13 protokol + gateway): sudo ./add-xray-user.sh <nama> | sudo ./remove-xray-user.sh <nama>" "Xray v5 用户（13 种协议 + 网关）：sudo ./add-xray-user.sh <name> | sudo ./remove-xray-user.sh <name>")"
+    fi
   fi
+  echo "  - $(T "AmneziaWG clients : sudo ./add-amneziawg-user.sh <name> | sudo ./remove-amneziawg-user.sh <name>" "Client AmneziaWG     : sudo ./add-amneziawg-user.sh <nama> | sudo ./remove-amneziawg-user.sh <nama>" "AmneziaWG 客户端：sudo ./add-amneziawg-user.sh <name> | sudo ./remove-amneziawg-user.sh <name>")"
+  echo "  - $(T "WS gateway (v5)   : ws://IP:80/<path> ws://IP:8080/<path> wss://IP:8443/<path> wss://IP:443/<path> (paths: /vmess /vless /trojan /vmess-xhttp /vless-xhttp /trojan-xhttp /ssh-ws /wg-ws)" "Gateway WS (v5)      : ws://IP:80/<path> ws://IP:8080/<path> wss://IP:8443/<path> wss://IP:443/<path> (path: /vmess /vless /trojan /vmess-xhttp /vless-xhttp /trojan-xhttp /ssh-ws /wg-ws)" "WS 网关 (v5)：ws://IP:80/<path> ws://IP:8080/<path> wss://IP:8443/<path> wss://IP:443/<path>（路径：/vmess /vless /trojan /vmess-xhttp /vless-xhttp /trojan-xhttp /ssh-ws /wg-ws）")"
   echo ""
 }
 

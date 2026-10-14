@@ -575,7 +575,11 @@ svc_restart_tested() {
   local unit="$1"; shift
   if [[ $# -gt 0 ]]; then
     log_step "$(T "Validating $unit config before restart..." "Memvalidasi konfigurasi $unit sebelum restart..." "正在重启前验证 $unit 配置...")"
-    if ! "$@" 2>&1 | tail -n5; then
+    # PIPESTATUS-based: without pipefail, `$?` after `| tail` would be tail's
+    # status (always 0) and a broken config would slip through to restart.
+    "$@" 2>&1 | tail -n5
+    local _test_rc="${PIPESTATUS[0]:-0}"
+    if [[ "$_test_rc" -ne 0 ]]; then
       die "$(T "$unit config test FAILED — restart aborted, service left running." "Tes konfigurasi $unit GAGAL — restart dibatalkan, service tetap berjalan." "$unit 配置测试失败 — 已中止重启，服务保持运行。")"
     fi
   fi

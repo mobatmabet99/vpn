@@ -37,6 +37,12 @@ source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/xray.sh"
 # shellcheck source=lib/ssl.sh
 source "$SCRIPT_DIR/lib/ssl.sh"
+# shellcheck source=lib/edge.sh
+source "$SCRIPT_DIR/lib/edge.sh"
+# shellcheck source=lib/wstunnel.sh
+source "$SCRIPT_DIR/lib/wstunnel.sh"
+# shellcheck source=lib/amneziawg.sh
+source "$SCRIPT_DIR/lib/amneziawg.sh"
 
 need_root
 
@@ -76,20 +82,25 @@ EOF
   echo " [25] $(T "Show saved account summary (all users / one user + QR)" "Lihat ringkasan akun tersimpan (semua user / satu user + QR)" "查看已保存账号摘要（全部用户 / 单个用户 + 二维码）")"
   echo " [15] $(T "Uninstall / cleanly remove VPN from server" "Uninstall / Hapus Bersih VPN dari Server" "卸载 / 从服务器彻底删除 VPN")"
   echo " [16] $(T "Check IP & bandwidth limits (wrwb Store)" "Cek Limit IP & Bandwidth (wrwb Store)" "检查 IP 与带宽限制 (wrwb Store)")"
-  echo " [17] $(T "Switch language (English/Indonesia/中文）" "Ganti bahasa (English/Indonesia/中文）" "切换语言 (英语/印尼语/中文）")"
+  echo " [17] $(T "Switch language (English/Indonesia/中文)" "Ganti bahasa (English/Indonesia/中文)" "切换语言 (英语/印尼语/中文)")"
   echo "----------------------------------------------------------------"
   echo " [18] $(T "❤️  Support Us — Donate via QRIS" "❤️  Dukung Kami — Donasi via QRIS" "❤️  支持我们 — 通过 QRIS 捐赠")"
   echo "----------------------------------------------------------------"
-  echo " $(T "🆕 v4 Features:" "🆕 Fitur v4:" "🆕 v4 功能：")"
+  echo " $(T "🆕 v5 Features:" "🆕 Fitur v5:" "🆕 v5 功能：")"
   echo " [19] $(T "Setup Telegram Bot (remote management)" "Setup Bot Telegram (manajemen remote)" "配置 Telegram Bot（远程管理）")"
   echo " [20] $(T "Setup Web Dashboard (browser control)" "Setup Web Dashboard (kontrol browser)" "配置 Web 控制面板（浏览器）")"
   echo " [21] $(T "Setup Auto Backup (daily backups)" "Setup Auto Backup (backup harian)" "配置自动备份（每日备份）")"
   echo " [22] $(T "Manual Backup Now" "Backup Manual Sekarang" "立即手动备份")"
-  echo " [23] $(T "Install ALL v4 Features" "Instal SEMUA Fitur v4" "安装所有 v4 功能")"
-   echo " [24] $(T "Setup SSL Certificate via acme.sh (standalone/DNS)" "Setup Sertifikat SSL via acme.sh (standalone/DNS)" "经 acme.sh 设置 SSL 证书 (standalone/DNS)")"
+  echo " [23] $(T "Install ALL Extra Features" "Instal SEMUA Fitur Tambahan" "安装所有附加功能")"
+  echo " [24] $(T "Setup SSL Certificate via acme.sh (standalone/DNS)" "Setup Sertifikat SSL via acme.sh (standalone/DNS)" "经 acme.sh 设置 SSL 证书 (standalone/DNS)")"
+  echo " [25] $(T "Re-show saved account summary" "Tampilkan ulang ringkasan akun tersimpan" "重新显示已保存账户摘要")"
+  echo " [26] $(T "Setup WS Gateway v5 (Nginx 80/8080/8443 + 443 fallback)" "Setup Gateway WS v5 (Nginx 80/8080/8443 + fallback 443)" "配置 v5 WS 网关 (Nginx 80/8080/8443 + 443 回退)")"
+  echo " [27] $(T "Setup WireGuard-WS tunnel (wstunnel)" "Setup Tunnel WireGuard-WS (wstunnel)" "配置 WireGuard-WS 隧道 (wstunnel)")"
+  echo " [28] $(T "Setup AmneziaWG (DPI-resistant WireGuard)" "Setup AmneziaWG (WireGuard anti-DPI)" "配置 AmneziaWG（抗 DPI WireGuard）")"
+  echo " [29] $(T "Manage AmneziaWG clients (add/remove/list)" "Kelola Client AmneziaWG (tambah/hapus/daftar)" "管理 AmneziaWG 客户端（添加/删除/列出）")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v4.9" "Dibuat oleh wrwb Store v4.9" "由 wrwb Store 打造 v4.9")"
+  echo " $(T "by wrwb Store v5" "Dibuat oleh wrwb Store v5" "由 wrwb Store 打造 v5")"
 }
 
 pause() {
@@ -148,7 +159,7 @@ menu_switch_language() {
 main_loop() {
   while true; do
     show_menu
-    read -rp "$(T "Choose menu [0-25]: " "Pilih menu [0-25]: " "选择菜单 [0-25]：")" choice
+    read -rp "$(T "Choose menu [0-29]: " "Pilih menu [0-29]: " "选择菜单 [0-29]：")" choice
     case "$choice" in
       1)
         "$SCRIPT_DIR/install.sh"
@@ -175,7 +186,7 @@ main_loop() {
         pause
         ;;
       7)
-        ssh_setup_server "$(get_public_ip)" 22 143 444 8080
+        ssh_setup_server "$(get_public_ip)" 22 143 444 10080
         read -rp "$(T "Create the first SSH account now? [Y/n]: " "Buat akun SSH pertama sekarang? [Y/n]: " "现在创建首个 SSH 账号吗？[Y/n]：")" make_ssh_u
         if [[ ! "${make_ssh_u:-Y}" =~ ^[Nn]$ ]]; then
           read -rp "$(T "Username: " "Username: " "用户名：")" ssh_uname
@@ -248,7 +259,12 @@ main_loop() {
           svc_restart_tested "ssh" sshd -t
         fi
         if systemctl list-unit-files 2>/dev/null | grep -q "^xray\.service" && [[ -x /usr/local/bin/xray && -f /etc/xray/config.json ]]; then
-          svc_restart_tested "xray" /usr/local/bin/xray run -test -config /etc/xray/config.json
+          # v5: engine-aware validation (xray `run -test`, v2ray `test -c`).
+          if xray_test_config /etc/xray/config.json; then
+            svc_restart "xray"
+          else
+            log_warn "$(T "xray config test FAILED — restart skipped, service left running." "Tes konfigurasi xray GAGAL — restart dilewati, service tetap berjalan." "xray 配置测试失败 — 已跳过重启，服务保持运行。")"
+          fi
         elif systemctl list-unit-files 2>/dev/null | grep -q "^xray\.service"; then
           svc_restart "xray"
         fi
@@ -272,8 +288,26 @@ main_loop() {
         if systemctl list-unit-files 2>/dev/null | grep -q "shadowsocks-rust"; then
           svc_restart "shadowsocks-rust"
         fi
-        for svc in dropbear ssh-ws; do
+        for svc in dropbear ssh-ws wstunnel; do
           if systemctl list-unit-files 2>/dev/null | grep -q "^${svc}\\.service"; then
+            svc_restart "$svc"
+          fi
+        done
+        if systemctl list-unit-files 2>/dev/null | grep -q "^nginx\\.service"; then
+          # v5: Alpine conf lives in http.d, not conf.d — check both.
+          if [[ -f /etc/nginx/conf.d/vpn-ws-gateway.conf || -f /etc/nginx/http.d/vpn-ws-gateway.conf ]] && command -v nginx &>/dev/null; then
+            if nginx -t >/dev/null 2>&1; then
+              svc_restart "nginx"
+            else
+              log_warn "$(T "Nginx config test FAILED — skipping nginx restart." "Tes konfigurasi Nginx GAGAL — restart nginx dilewati." "Nginx 配置测试失败 — 已跳过 nginx 重启。")"
+            fi
+          else
+            svc_restart "nginx"
+          fi
+        fi
+        for svc in "awg-quick@awg0" "awg0"; do
+          # -F fixed pattern (same string as status.sh — see comment there).
+          if systemctl list-unit-files 2>/dev/null | grep -qF "${svc}.service" || systemctl cat "$svc" &>/dev/null; then
             svc_restart "$svc"
           fi
         done
@@ -324,6 +358,50 @@ main_loop() {
         ;;
       25)
         "$SCRIPT_DIR/show-account.sh"
+        pause
+        ;;
+      26)
+        edge_setup_server "$(get_public_ip)"
+        pause
+        ;;
+      27)
+        _wg_port="51820"
+        if [[ -f /etc/wireguard/params ]]; then
+          # shellcheck disable=SC1091
+          source /etc/wireguard/params 2>/dev/null || true
+          _wg_port="${SERVER_PORT:-51820}"
+        fi
+        wstunnel_setup_server "$_wg_port" "$(get_public_ip)"
+        pause
+        ;;
+      28)
+        awg_setup_server "$(get_public_ip)" "${AWG_PORT:-51821}" "$(get_default_iface)"
+        read -rp "$(T "Create the first AmneziaWG client now? [Y/n]: " "Buat client AmneziaWG pertama sekarang? [Y/n]: " "现在创建首个 AmneziaWG 客户端吗？[Y/n]：")" make_awg_c
+        if [[ ! "${make_awg_c:-Y}" =~ ^[Nn]$ ]]; then
+          read -rp "$(T "Client name: " "Nama client: " "客户端名称：")" awg_name
+          awg_create_client "${awg_name:-client1}" || true
+        fi
+        pause
+        ;;
+      29)
+        echo "$(T "Manage AmneziaWG clients:" "Kelola Client AmneziaWG:" "管理 AmneziaWG 客户端：")"
+        echo "  1) $(T "Add client" "Tambah client" "添加客户端")"
+        echo "  2) $(T "Remove client" "Hapus client" "删除客户端")"
+        echo "  3) $(T "Show client config" "Lihat config client" "查看客户端配置")"
+        read -rp "$(T "Choose [1-3]: " "Pilih [1-3]: " "选择 [1-3]：")" awg_m
+        case "$awg_m" in
+          1) "$SCRIPT_DIR/add-amneziawg-user.sh" ;;
+          2) "$SCRIPT_DIR/remove-amneziawg-user.sh" ;;
+          3)
+            read -rp "$(T "Client name: " "Nama client: " "客户端名称：")" awg_show
+            if [[ -f "/etc/amneziawg/clients/${awg_show}/${awg_show}.conf" ]]; then
+              cat "/etc/amneziawg/clients/${awg_show}/${awg_show}.conf"
+            else
+              log_warn "$(T "AmneziaWG client '$awg_show' not found." "Client AmneziaWG '$awg_show' tidak ditemukan." "未找到 AmneziaWG 客户端 '$awg_show'。")"
+            fi
+            ;;
+          *) log_warn "$(T "Invalid choice." "Pilihan tidak valid." "选择无效。")" ;;
+        esac
         pause
         ;;
       0)

@@ -20,6 +20,8 @@ source "$SCRIPT_DIR/lib/common.sh"
 source "$SCRIPT_DIR/lib/system.sh"
 # shellcheck source=lib/ssl.sh
 source "$SCRIPT_DIR/lib/ssl.sh"
+# shellcheck source=lib/edge.sh
+source "$SCRIPT_DIR/lib/edge.sh"
 
 install_cleanup_trap
 need_root
@@ -131,6 +133,10 @@ esac
 
 echo ""
 ssl_status
+echo ""
+# v5: point the Nginx WS gateway (8443) at the new cert immediately
+# (the --reloadcmd hook covers future auto-renews; this covers "just issued now").
+edge_refresh_tls 2>/dev/null || true
 echo ""
 log_success "$(T "SSL setup complete! Cert: $SSL_DIR/$DOMAIN/fullchain.pem | Key: $SSL_DIR/$DOMAIN/key.pem" "Setup SSL selesai! Cert: $SSL_DIR/$DOMAIN/fullchain.pem | Key: $SSL_DIR/$DOMAIN/key.pem" "SSL 设置完成！证书：$SSL_DIR/$DOMAIN/fullchain.pem | 私钥：$SSL_DIR/$DOMAIN/key.pem")"
 echo "$(T "Use it for: Xray TLS inbounds, Stunnel, Nginx/Caddy, Web Dashboard (https)." "Gunakan untuk: Xray TLS inbound, Stunnel, Nginx/Caddy, Web Dashboard (https)." "可用于：Xray TLS 入站、Stunnel、Nginx/Caddy、Web 面板 (https)。")"

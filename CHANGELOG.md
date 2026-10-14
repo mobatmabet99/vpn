@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.9. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v5. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.9 (Latest - 14 Oktober 2026)](#v49---systemd-service-management--account-output) — **Systemd + Account Summary**
+- [v5 (Latest - 14 Oktober 2026)](#v5---unified-8044380808443-gateway--wg-ws--amneziawg) — **Unified Gateway + WG-WS + AmneziaWG**
+- [v4.9 (14 Oktober 2026)](#v49---systemd-service-management--account-output) — **Systemd + Account Summary**
 - [v4.8 (14 Oktober 2026)](#v48---idempotency--error-handling-script-robustness) — **Idempotency & Error Handling**
 - [v4.7 (14 Oktober 2026)](#v47---otomatisasi-ssltls-certificate-acmesh) — **SSL/TLS via acme.sh**
 - [v4.6 (14 Oktober 2026)](#v46---dynamic-firewall-handling) — Dynamic Firewall Handling
@@ -27,6 +28,25 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.9. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v5 — Unified 80/443+8080/8443 Gateway + WG-WS + AmneziaWG
+
+**Tanggal**: 14 Oktober 2026
+**Detail**: [changelogs/v5.md](changelogs/v5.md)
+
+### 🔥 Highlight
+
+**Satu gateway Nginx untuk semua WS/XHTTP + WireGuard-over-WebSocket + AmneziaWG anti-DPI**
+
+- ✅ **Nginx WS gateway** — `80/8080` plain + `8443` TLS (acme.sh/self-signed) + `443` via REALITY fallback → Xray WS (10001-10003), XHTTP localhost (10009-10011), SSH-WS (10080), WG-WS (10081)
+- ✅ **XHTTP localhost fix** — v4.2 tiga inbound berbagi port 80 (hanya 1 yang hidup) → v5 tiap inbound port sendiri + routing Nginx per-path; REALITY-XHTTP pindah 443→10012
+- ✅ **WG-WS via wstunnel v11** — `wstunnel server 127.0.0.1:10081` + path `/wg-ws /wireguard-ws`, WG murni 51820 untouched
+- ✅ **AmneziaWG `awg0:51821/udp`** — interface kedua anti-DPI (Jc/Jmin/Jmax/S1/S2/H1-H4), soft-skip bila binary tak ada, menu 28/29 + `add/remove-amneziawg-user.sh`
+- ✅ **SSH-WS localhost `10080`** — publik via gateway; argumen lama `8080` diremap otomatis
+- ✅ **v2ray 7-inbound kompatibel** — tanpa REALITY/XTLS-Vision/XHTTP (v2ray-core tak punya itu); validasi `xray_test_config()` engine-aware (`run -test` vs `test -c`); link/QR/summary dibedakan
+- ✅ **SSL hook cron-safe** — `--reloadcmd` hanya perintah nyata (tanpa fungsi shell); gateway di-refresh langsung pasca-issuance
 
 ---
 
@@ -394,19 +414,21 @@ Jika OS ID tidak dikenali:
 | v4.6 | 13 | (Dynamic firewall handling) ✅ |
 | v4.7 | 13 | (SSL/TLS via acme.sh) 🔒 |
 | v4.8 | 13 | (Robustness: strict + portcheck + trap) 🛡️ |
-| **v4.9** | **13** | **(Systemd test-restart + account summary + QR)** ⚙️ |
+| v4.9 | 13 | (Systemd test-restart + account summary + QR) ⚙️ |
+| **v5** | **13+2** | **(Unified 80/443+8080/8443 gateway + WG-WS + AmneziaWG)** 🌐 |
 
 ---
 
-## 🎯 Rekomendasi Protocol (v4.2)
+## 🎯 Rekomendasi Protocol (v5)
 
 **Priority order untuk koneksi terbaik**:
 
-1. 🥇 **VLESS + XHTTP + REALITY @ Port 443** — Ultimate stealth, paling mirip HTTP
-2. 🥈 **VLESS + TCP + REALITY @ Port 443** — Most efficient, XTLS-Vision
+1. 🥇 **VLESS + XHTTP + REALITY @ Port 10012** — Ultimate stealth, paling mirip HTTP
+2. 🥈 **VLESS + TCP + REALITY @ Port 443** — Most efficient, XTLS-Vision (+ WS-TLS via 443 fallback → 8443)
 3. 🥉 **VLESS + gRPC + REALITY** — Best for CDN & heavy censorship
-4. **VLESS + XHTTP @ Port 80** — HTTP stealth tanpa TLS
+4. **VLESS + XHTTP via gateway @ Port 80/8080/8443** — HTTP stealth via Nginx (`/vless-xhttp`)
 5. **VLESS + XTLS @ Port 10004** — Plain performance
+6. **AmneziaWG @ 51821/udp + WG-WS via gateway** — Anti-DPI & firewall-proof paths
 
 ---
 
@@ -440,4 +462,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.9 (Systemd test-restart + Account summary + QR + 13 Protocols)
+**Dibuat oleh wrwb Store** — v5 (Unified 80/443+8080/8443 gateway + WG-WS + AmneziaWG + 13 Protocols)

@@ -46,7 +46,12 @@ install_shadowsocks_binary() {
 
     log_info "$(T "Downloading shadowsocks-rust ($ss_ver) from GitHub..." "Mengunduh shadowsocks-rust ($ss_ver) dari GitHub..." "正在从 GitHub 下载 shadowsocks-rust（$ss_ver）...")"
     local tmp_tar
-    tmp_tar="$(mktemp --suffix=.tar.xz)"
+    # Portable mktemp (Alpine/busybox lacks --suffix) — see lib/xray.sh.
+    if tmp_tar="$(mktemp --suffix=.tar.xz 2>/dev/null)"; then
+      :
+    else
+      tmp_tar="$(mktemp)/ss.tar.xz"
+    fi
     track_temp "$tmp_tar"
     if curl -fsSL --retry 2 --connect-timeout 20 "$ss_url" -o "$tmp_tar"; then
       tar -xJf "$tmp_tar" -C /usr/local/bin ssserver 2>/dev/null || tar -xvf "$tmp_tar" -C /usr/local/bin ssserver
@@ -97,7 +102,7 @@ EOF
   # Buat systemd service unit
   cat > /etc/systemd/system/shadowsocks-rust.service <<EOF
 [Unit]
-Description=Shadowsocks-rust Server Service v4.9 (auto-start on boot)
+Description=Shadowsocks-rust Server Service v5 (auto-start on boot)
 After=network.target
 
 [Service]

@@ -49,8 +49,9 @@
 | 功能 | 说明 |
 |---|---|
 | 🔌 **主协议** | WireGuard (ChaCha20-Poly1305, MTU 1420)，自动生成服务端 + 客户端密钥对、预共享密钥 (PSK)、客户端 `.conf` 文件与二维码 (PNG + 终端 ANSI) |
-| 🔑 **SSH VPN (默认开启)** | OpenSSH 加固 + Dropbear (端口 143) + SSH over TLS/Stunnel (端口 444) + SSH over WebSocket (端口 80)。账号管理：`add-ssh-user.sh` / `remove-ssh-user.sh` (带有效期) |
-| ⚡ **Xray-core (默认开启)** | v26.3.27 稳定版 — 5 个入站同时运行：VMess WS (10001)、VLESS WS (10002)、Trojan WS (10003)、VLESS TCP XTLS-Vision (10004)、**VLESS TCP XTLS-Vision + REALITY (443)**。1 个 UUID 通用于所有协议 + 自动生成链接与二维码 |
+| 🔑 **SSH VPN (默认开启)** | OpenSSH 加固 + Dropbear (端口 143) + SSH over TLS/Stunnel (端口 444) + 经 v5 网关的 SSH over WebSocket (`ws://IP:80/ssh-ws`、`ws://IP:8080/ssh-ws`、`wss://IP:8443/ssh-ws`、`wss://IP:443/ssh-ws`；本地后端 10080)。账号管理：`add-ssh-user.sh` / `remove-ssh-user.sh` (带有效期) |
+| ⚡ **Xray-core v5 (默认开启)** | v26.10.10 稳定版 (2026年10月) — **13 个入站同时生效**：VMess WS (10001)、VLESS WS (10002)、Trojan WS (10003)、VLESS TCP XTLS-Vision (10004)、**VLESS TCP XTLS-Vision + REALITY (443，回退 → 8443)**、**VMess gRPC (10005)**、**VLESS gRPC (10006)**、**Trojan gRPC (10007)**、**VLESS REALITY gRPC (10008)**、**VMess/VLESS/Trojan XHTTP 本地 (10009-10011，经网关 80/8080/443/8443)**、**VLESS REALITY XHTTP (10012)**。1 个 UUID 通用于所有协议 + 自动链接与二维码。**gRPC = 基于 HTTP/2，在 Debian 13 & Ubuntu 26 上非常流畅，适合 CDN/反代** |
+| 🌐 **统一网关 + WG-WS + AmneziaWG (v5)** | **Nginx WS 网关**：`80/8080` 明文 + `8443` TLS (acme.sh/自签) + `443` 经 REALITY 回退 → Xray WS (10001-10003)、XHTTP 本地 (10009-10011)、SSH-WS (10080)、WG-WS (10081)。**WireGuard over WebSocket** 经 wstunnel v11 (`/wg-ws`，原生 WG 51820 不变)。**AmneziaWG** 抗 DPI 第二接口 `awg0:51821/udp` (菜单 28/29 + `add/remove-amneziawg-user.sh`) |
 | 🔄 **备用引擎** | v2ray-core v5.53.0 (通过 `--with-v2ray` 或 `XRAY_ENGINE=v2ray` 切换)；OpenVPN 2.7/2.6 (加密 `AES-256-GCM` + `CHACHA20-POLY1305`，认证 `SHA512`，TLS 最低 1.3，`.ovpn` 配置) 可替代 SSH |
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
 | 🔒 **自动 SSL (v4.7)** | 经 **acme.sh** 签发 TLS 证书（轻量，无重型 Python 依赖）— **Standalone** 模式（临时端口 80）或 **Cloudflare DNS API**（不怕 CDN/防火墙）。cron 自动续期，存于 `/etc/vpn-ssl/<domain>/`，可用于 Xray TLS / Stunnel / Nginx。菜单 24 / `./setup-ssl.sh`（`install.sh` 默认预安装 acme.sh，经 `--no-ssl` 禁用）|
@@ -60,7 +61,7 @@
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |
 | 🔀 **NAT / 伪装** | 通过 WireGuard `PostUp`/`PostDown` 自动添加 `iptables ... -j MASQUERADE`，保证客户端正常上网 |
-| 📦 **模块化** | `install.sh`、`add-client.sh`、`remove-client.sh`、`list-clients.sh`、`show-qr.sh`、`show-account.sh` (v4.9)、`add-ssh-user.sh`、`remove-ssh-user.sh`、`add-xray-user.sh`、`remove-xray-user.sh`、`check-limits.sh`、`status.sh`、`menu.sh` (0-25)、`uninstall.sh`，以及 `lib/` 下的库 (含 `lib/lang.sh`、`lib/limits.sh`) |
+| 📦 **模块化** | `install.sh`、`add-client.sh`、`remove-client.sh`、`list-clients.sh`、`show-qr.sh`、`show-account.sh`、`add-ssh-user.sh`、`remove-ssh-user.sh`、`add-xray-user.sh`、`remove-xray-user.sh`、`add-amneziawg-user.sh`、`remove-amneziawg-user.sh`、`check-limits.sh`、`status.sh`、`menu.sh` (0-29)、`uninstall.sh`，以及 `lib/` 下的库 (含 `lib/lang.sh`、`lib/limits.sh`、`lib/edge.sh`、`lib/wstunnel.sh`、`lib/amneziawg.sh`) |
 | 🌐 **三语 (v1.4)** | 默认英文，另有印尼语、中文可选。单代码库通过 `lib/lang.sh` 的 `T "English" "Indonesia" "中文"` 实现，选择保存在 `/etc/vpn/lang` |
 | ⚠️ **错误处理** | 必须 root/sudo，检查 `/dev/net/tun`，系统检测 + 未测试发行版警告，端口与依赖检查，客户端/用户名校验，旧配置备份 |
 | ⏱️ **限制与暂停 (v1.2)** | 每个账号并发 IP + 每月带宽 GB 限制 (默认 2 IP & 100 GB)。多登录超限 = 自动暂停 5 分钟 + 自动清理会话。`vpn-limits` systemd 监控每 60 秒检查一次 |
@@ -76,30 +77,36 @@ vpn/
 ├── remove-client.sh        # 删除 WireGuard 客户端 (+ 清理限制数据)
 ├── list-clients.sh         # 列出 WG 客户端 + 流量统计与握手状态
 ├── show-qr.sh              # 重新显示客户端 WG 二维码 / .conf
+├── show-account.sh         # 重新显示已保存摘要（全部用户 / 单个用户 + --qr）
 ├── add-ssh-user.sh         # 创建 SSH VPN 账号 (有效期 + IP 与带宽限制)
 ├── remove-ssh-user.sh      # 删除 SSH VPN 账号 (+ 清理限制数据)
 ├── add-xray-user.sh        # 创建 Xray/V2Ray 用户 + IP 与带宽限制
 ├── remove-xray-user.sh     # 删除 Xray/V2Ray 用户 (+ 清理限制数据)
+├── add-amneziawg-user.sh   # (v5) 创建 AmneziaWG 客户端 + 二维码
+├── remove-amneziawg-user.sh # (v5) 删除 AmneziaWG 客户端
 ├── check-limits.sh         # 查看 IP 限制、配额、在线 IP 与暂停状态
-├── status.sh               # 诊断：服务、转发、TUN、NAT、防火墙、限制、语言
-├── menu.sh                 # 交互菜单 0-17 (wrwb Store 控制面板，含语言切换)
-├── uninstall.sh            # 彻底卸载 VPN (+ 限制监控 + /etc/vpn/lang)
+├── status.sh               # 诊断：服务（+enabled/自启）、转发、TUN、NAT、防火墙、限制、SSL、已保存摘要
+├── menu.sh                 # 交互菜单 0-29 (wrwb Store 控制面板，含 v5 网关 + 账号摘要)
+├── uninstall.sh            # 彻底卸载 VPN (+ 限制监控 + /etc/vpn/lang + /etc/vpn-script)
 ├── README.md               # 印尼语文档
 ├── README.en.md            # 英语文档 (默认)
 ├── README.zh.md            # 中文文档 (本文件)
-├── CHANGELOG-v1.2.md       # v1.2 更新日志 (IP 与带宽限制)
-├── CHANGELOG-v1.3.md       # v1.3 更新日志 (英/印尼双语)
-├── CHANGELOG-v1.4.md       # v1.4 更新日志 (英/印尼/中文三语)
+├── CHANGELOG.md            # v1.2 至 v5 更新汇总
+├── changelogs/             # 各版本详情 (v4.0-v4.2.md ... v5.md)
 ├── lib/
 │   ├── lang.sh             # v1.4 三语核心：T "EN" "ID" "ZH"，/etc/vpn/lang
 │   ├── common.sh           # 日志、系统检测、校验、网络工具、参数
 │   ├── system.sh           # 软件包安装、IP 转发、防火墙 (UFW/firewalld)
 │   ├── wireguard.sh        # WireGuard 核心：服务端配置、IP 分配、客户端增删
 │   ├── ssh.sh              # SSH 模块：OpenSSH+Dropbear+Stunnel+WebSocket，账号增删
-│   ├── xray.sh             # Xray/V2Ray 模块：VMess/VLESS/Trojan+XTLS/REALITY
+│   ├── xray.sh             # Xray/V2Ray 模块：VMess/VLESS/Trojan+XTLS/REALITY+gRPC+XHTTP
 │   ├── limits.sh           # v1.2 模块：IP 与带宽限制 + 5 分钟自动暂停
 │   ├── openvpn.sh          # 备用 OpenVPN + Easy-RSA 模块
-│   └── shadowsocks.sh      # 可选 Shadowsocks-rust 模块
+│   ├── shadowsocks.sh      # 可选 Shadowsocks-rust 模块
+│   ├── ssl.sh              # acme.sh SSL 模块 + 网关刷新
+│   ├── edge.sh             # (v5) Nginx WS 网关 80/8080/8443 + 443 回退
+│   ├── wstunnel.sh         # (v5) 经 wstunnel 的 WireGuard-over-WebSocket
+│   └── amneziawg.sh        # (v5) AmneziaWG 抗 DPI (awg0:51821)
 ├── .gitattributes          # 强制 LF 换行，保证脚本在 Linux 上安全
 ```
 
@@ -115,7 +122,7 @@ vpn/
 /etc/vpn/lang                      # v1.4 语言选择 ("en" / "id" / "zh")
 /etc/ssh-vpn/params                # SSH/Dropbear/TLS/WS 端口 + 公网 IP
 /etc/ssh-vpn/accounts.db           # SSH 账号数据库 (user:created:expiry)
-/etc/xray/config.json              # Xray/V2Ray 配置 (5 个入站)
+/etc/xray/config.json              # Xray/V2Ray 配置 (13 个入站 xray / 7 个入站 v2ray)
 ```
 
 ```
@@ -131,7 +138,7 @@ vpn/
 2. **Root 权限** — 所有脚本必须以 root / `sudo` 运行。
 3. **TUN 设备** 可用 (`/dev/net/tun`)。绝大多数 KVM VPS 已启用。OpenVZ/LXC 请先在服务商面板启用 TUN。
 4. 服务器需**联网**以下载软件包 (apt/dnf) 与 GitHub 二进制 (Xray/Shadowsocks)。
-5. 云防火墙放行空闲端口：UDP 51820 (WireGuard)，TCP 22/80/143/444 (SSH)，TCP 443/10001-10004 (Xray)。
+5. 云防火墙放行空闲端口：UDP 51820 (WireGuard)，UDP 51821 (AmneziaWG v5)，TCP 22/143/444 (SSH)，TCP 80/8080/8443 (v5 网关) + TCP 443/10001-10008/10012 (Xray)。
 6. 服务器需 **Python 3** (一般预装；Xray 模块用于安全编辑 JSON)。
 
 ---
@@ -215,10 +222,11 @@ XRAY_ENGINE=v2ray sudo ./install.sh --yes
 8. 通过动态防火墙 (UFW / firewalld / nftables / iptables) 开放 WireGuard UDP 端口。
 9. 生成服务端密钥对，写入 `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`)，保存 `params`。
 10. 创建首个 WireGuard 客户端 + `.conf` + 二维码，然后启用并启动 `wg-quick@wg0`。
-11. **安装 SSH VPN** (默认)：OpenSSH 加固 + Dropbear:143 + Stunnel:444 + WebSocket:80。
-12. **安装 Xray-core** (默认)：5 个入站 VMess/VLESS/Trojan + XTLS-Vision + REALITY:443 + 连接链接与二维码。
-13. (可选) 按需安装 OpenVPN / Shadowsocks。
-14. 显示总结 + 快捷命令。
+11. **安装 SSH VPN** (默认)：OpenSSH 加固 + Dropbear:143 + Stunnel:444 + 经 v5 网关的 SSH-WS 本地 10080 (80/8080/8443/443)。
+12. **安装 Xray-core v5** (默认)：13 个入站 (xray) / 7 个入站 (v2ray) — VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS-Vision + REALITY:443 + 链接与二维码。
+13. **安装 wstunnel + Nginx 网关 + AmneziaWG (v5)**：WG-WS 10081，网关 80/8080/8443 + 443 回退，AWG `awg0:51821/udp`。
+14. (可选) 按需安装 OpenVPN / Shadowsocks。
+15. 显示总结 + 快捷命令。
 
 ### 4. 备选：交互菜单
 
@@ -227,7 +235,7 @@ sudo ./menu.sh
 sudo ./menu.sh --lang zh   # 本次强制中文
 ```
 
-菜单 0–17：安装 WG、添加/删除 WG 客户端、显示二维码、列出客户端、检查状态、安装 SSH / OpenVPN / Xray / V2Ray / Shadowsocks、管理 SSH 账号、管理 Xray 用户、重启服务、检查限制、切换语言 (17)、卸载。
+菜单 0-29：安装 WG、添加/删除 WG 客户端、显示二维码、列出客户端、检查状态、安装 SSH / OpenVPN / Xray / V2Ray / Shadowsocks、管理 SSH 账号、管理 Xray 用户、重启服务、检查限制、切换语言 (17)、卸载、v5 网关 (26-29)、Telegram/Bot/面板/备份 (19-24)。
 
 ---
 
@@ -251,7 +259,7 @@ sudo ./show-qr.sh phone-andi         # 重新显示二维码 + .conf
 
 ## 🔑 SSH VPN — 账号管理
 
-WireGuard 之后的默认第二服务。端口：OpenSSH **22**、Dropbear **143**、SSH-over-TLS **444**、SSH-over-WS **80**。
+WireGuard 之后的默认第二服务。端口：OpenSSH **22**、Dropbear **143**、SSH-over-TLS **444**、经 v5 网关的 SSH-over-WS (`ws://IP:80/ssh-ws`、`ws://IP:8080/ssh-ws`、`wss://IP:8443/ssh-ws`、`wss://IP:443/ssh-ws`)。
 
 ```bash
 sudo ./add-ssh-user.sh                    # 交互 (询问 IP 与带宽限制)
@@ -271,27 +279,57 @@ ssh -p 22 andi@SERVER-IP
 
 ---
 
-## ⚡ Xray / V2Ray — 用户管理 (VMess / VLESS / Trojan + XTLS / REALITY)
+## ⚡ Xray / V2Ray v5 — 用户管理 (VMess / VLESS / Trojan + XTLS / REALITY + gRPC + XHTTP + 网关)
 
-一个用户 = 1 个 UUID，在**全部 5 个入站**生效：
+一个用户 = 1 个 UUID，在**全部 13 个入站 (xray 引擎)** 或 **7 个入站 (v2ray 引擎)** 生效：
 
 | # | 协议 | 端口 | 适用场景 |
 |---|---|---|---|
-| 1 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **首选** — 最高效、防封锁，无需自备域名/TLS (SNI `www.microsoft.com`) |
-| 2 | VLESS + TCP + XTLS-Vision | 10004 | 干净网络最快 / 自备 TLS 前置时 |
-| 3 | VMess + WebSocket (`/vmess`) | 10001 | 老客户端兼容 |
-| 4 | VLESS + WebSocket (`/vless`) | 10002 | CDN/反代之后 (Cloudflare 等) |
-| 5 | Trojan + WebSocket (`/trojan`) | 10003 | 伪装 HTTPS 流量 |
+| 1 | **VLESS + XHTTP + REALITY** | 10012 | **🏆 最佳** — 最像 HTTP，终极隐身 |
+| 2 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **首选** — 最高效、防封锁，无需自备域名/TLS (SNI `www.microsoft.com`) + WS-TLS 回退 → 8443 |
+| 3 | VLESS + gRPC + REALITY | 10008 | **重审查 + CDN 最佳** — HTTP/2，在 Debian 13/Ubuntu 26 上非常稳定 |
+| 4 | VLESS + TCP + XTLS-Vision | 10004 | 干净网络最快 / 自备 TLS 前置时 |
+| 5-7 | VMess/VLESS/Trojan + XHTTP 经网关 | 80/8080/8443/443 | 经 Nginx 的 HTTP 隐身 (`/vmess-xhttp`、`/vless-xhttp`、`/trojan-xhttp`) |
+| 8-10 | VMess/VLESS/Trojan + WebSocket | 10001-10003 直连 / 80/8080 网关 | 老客户端兼容 + CDN 之后 |
+| 11-13 | VMess/VLESS/Trojan + gRPC | 10005-10007 | HTTP/2，高效，适合 CDN/Nginx/Caddy |
+
+| # | 协议 (v2ray 引擎 — 7 个入站) | 端口 | 适用场景 |
+|---|---|---|---|
+| 1 | VLESS + 纯 TCP | 10004 | 干净网络最快 / 自备 TLS 前置时 |
+| 2-4 | VMess/VLESS/Trojan + WebSocket (`/vmess` `/vless` `/trojan`) | 10001-10003 | 老客户端兼容 + CDN 之后 |
+| 5-7 | VMess/VLESS/Trojan + gRPC (`VMessGRPC`/`VLessGRPC`/`TrojanGRPC`) | 10005-10007 | HTTP/2，高效，适合 CDN/Nginx/Caddy |
 
 ```bash
-sudo ./add-xray-user.sh phone-andi       # 创建用户 + 打印 5 条链接 + REALITY 二维码 (默认限制)
+sudo ./add-xray-user.sh phone-andi       # 创建用户 + 打印链接 + 二维码 (默认限制)
 sudo ./add-xray-user.sh phone-andi 3 200 # 创建用户，限制 3 IP / 200 GB
 sudo ./remove-xray-user.sh phone-andi    # 从所有入站删除
 ```
 
-推荐客户端：安卓 **v2rayNG / NekoBox**，iOS **Streisand / FoXray / Shadowrocket**，桌面 **Nekoray / Hiddify**。优先级：**VLESS REALITY > VLESS XTLS > VMess/VLESS/Trojan WS**。复制以 `vless://...security=reality...` 开头的链接效果最好。
+推荐客户端：安卓 **v2rayNG / NekoBox**，iOS **Streisand / FoXray / Shadowrocket**，桌面 **Nekoray / Hiddify**。v5 优先级：**VLESS XHTTP+REALITY (10012) > VLESS TCP+REALITY (443) > VLESS gRPC+REALITY (10008) > VLESS XTLS (10004) > 经网关 XHTTP > gRPC > WS**。复制以 `vless://...security=reality...` 开头的链接效果最好。
 
-安装时切换默认引擎 (`xray` → `v2ray`)：`sudo ./install.sh --with-v2ray --yes` 或 `XRAY_ENGINE=v2ray sudo ./install.sh --yes`。
+安装时切换默认引擎 (`xray` → `v2ray`)：`sudo ./install.sh --with-v2ray --yes` 或 `XRAY_ENGINE=v2ray sudo ./install.sh --yes`。v2ray 引擎 = 7 个入站 (3× WS + 3× gRPC + 1× 纯 TCP，无 REALITY/XHTTP/XTLS-Vision)。
+
+---
+
+## 🌐 v5 网关 — Nginx 80/8080/8443 + 443 回退、WG-WS 与 AmneziaWG
+
+单个 Nginx 网关承载所有 WS/XHTTP，无需双份配置（菜单 **26**）：
+
+| 端口 | 性质 | 路由 |
+|---|---|---|
+| `80/tcp` | 明文非 TLS | `/vmess /vless /trojan` → 10001-10003，`/vmess-xhttp /vless-xhttp /trojan-xhttp` → 10009-10011，`/ssh-ws` → 10080，`/wg-ws` → 10081 |
+| `8080/tcp` | 备用明文 | 相同路由（+ 老 SSH-WS 客户端用的旧 `/`） |
+| `8443/tcp` | TLS (有 acme.sh 则用之，否则 10 年自签) | 经 `wss://` 相同路由 |
+| `443/tcp` | VLESS TCP REALITY + 回退 → 8443 | 经 443 的 WS-TLS 使用 `security=tls` + 网关 SNI（非 REALITY pbk/sid） |
+
+**WireGuard over WebSocket**（菜单 **27**）：`WG 客户端 → wstunnel 客户端 → WS/WSS (80/8080/443/8443) → Nginx /wg-ws → wstunnel 127.0.0.1:10081 → 本地 WG 51820`。原生 UDP WG 51820 不变。
+
+**AmneziaWG 抗 DPI**（菜单 **28/29**）：第二接口 `awg0:51821/udp` + 自动 `Jc/Jmin/Jmax/S1/S2/H1-H4` 混淆：
+
+```bash
+sudo ./add-amneziawg-user.sh phone-awg       # 创建客户端 + 二维码 (默认限制)
+sudo ./remove-amneziawg-user.sh phone-awg    # 删除客户端
+```
 
 ---
 
@@ -378,7 +416,7 @@ sudo ./uninstall.sh
 - **改 VPN 子网：** 改 `install.sh` 的 `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` 与 `lib/wireguard.sh` 的 `base_v4`/`base_v6` (`wg_write_server_conf` 与 `wg_get_next_ip` 保持一致)。
 - **改默认 DNS：** 改 `install.sh` 的 `DEFAULT_DNS`。
 - **改默认语言：** 无需改代码 — 用 `--lang en|id|zh`、`VPN_LANG=zh` 或菜单 17。文件：`/etc/vpn/lang`。
-- **改 Xray/V2Ray 版本：** 改 `lib/xray.sh` 的 `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) — 最新版见 [Xray-core releases](https://github.com/XTLS/Xray-core/releases) 与 [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases)。
+- **改 Xray/V2Ray 版本：** 改 `lib/xray.sh` 的 `XRAY_VERSION_DEFAULT` (`v26.10.10`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) — 最新版见 [Xray-core releases](https://github.com/XTLS/Xray-core/releases) 与 [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases)。
 - **改 Xray 入站端口：** 安装前改 `lib/xray.sh` 的 `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY`。
 - **改 REALITY SNI：** 改 `lib/xray.sh` 的 `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` (要求：国外大域名、TLSv1.3 + H2、无跳转)。
 - **改 Shadowsocks 版本：** 改 `lib/shadowsocks.sh` 的 `SS_VERSION_DEFAULT` (默认 `v1.25.0`，见 [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases))。
@@ -415,4 +453,4 @@ for f in *.sh lib/*.sh; do bash -n "$f" && echo "OK: $f"; done
 个人与商业用途均免费。按“现状”提供，不含保证。运行 VPN 服务时请遵守网络服务商法律/ToS。
 
 ---
-由 **wrwb Store** 打造 — v1.4 (英/印尼/中文三语，默认英文 + 2-IP & 100-GB 限制，5 分钟自动暂停)。
+由 **wrwb Store** 打造 — v5 (统一 80/443+8080/8443 网关 + WG-WS + AmneziaWG + 2-IP & 100-GB 限制，5 分钟自动暂停)。

@@ -173,13 +173,17 @@ ssl_cert_days_left() {
 # Mengembalikan daftar service yang dihentikan via SSL_STOPPED_SVCS (dipakai ssl_restore_port80)
 ssl_free_port80() {
   SSL_STOPPED_SVCS=""
+  # v5: xray NEVER listens on 80 anymore (XHTTP backends are localhost-only
+  # 10009-10011; public path is the Nginx gateway). Stopping xray here would
+  # needlessly drop ALL active proxy connections during issuance. Only stop
+  # services that can actually own :80 (nginx/apache/caddy) + ssh-ws legacy.
   # v4.8: hard conflict check on :80 (ss/netstat//proc fallback + owner name)
   if is_port_in_use "80" "tcp"; then
     log_warn "$(T "Port 80/tcp is occupied (owner: $(port_owner 80 tcp))." "Port 80/tcp ditempati (pemilik: $(port_owner 80 tcp))." "端口 80/tcp 被占用（占用者：$(port_owner 80 tcp)）。")"
   fi
   if command -v ss &>/dev/null && ss -lnt 2>/dev/null | grep -Eq ":(80)[[:space:]]"; then
     log_warn "$(T "Port 80 is in use — stopping conflicting services temporarily..." "Port 80 sedang dipakai — menghentikan service yang konflik sementara..." "端口 80 被占用 — 正在临时停止冲突服务...")"
-    for svc in ssh-ws nginx apache2 httpd caddy trojan-go; do
+    for svc in nginx apache2 httpd caddy ssh-ws; do
       if systemctl is-active --quiet "$svc" 2>/dev/null; then
         systemctl stop "$svc" 2>/dev/null || true
         SSL_STOPPED_SVCS="$SSL_STOPPED_SVCS $svc"
@@ -264,6 +268,9 @@ ssl_issue_dns() {
 }
 
 # Install sertifikat ke $SSL_DIR/<domain>/ + set reload hook (restart xray bila ada)
+# v5: reload BOTH xray (REALITY/XHTTP-TLS users) and the Nginx WS gateway (8443).
+# The --reloadcmd runs later under cron WITHOUT our shell functions, so it must
+# only reference real commands (no `edge_refresh_tls` shell function here).
 ssl_install_cert() {
   local domain="$1"
   local dest="$SSL_DIR/$domain"
@@ -273,6 +280,13 @@ ssl_install_cert() {
   local reload_cmd="true"
   if systemctl list-unit-files 2>/dev/null | grep -q "^xray\\.service"; then
     reload_cmd="systemctl reload-or-restart xray"
+  fi
+  if [[ -f /etc/nginx/conf.d/vpn-ws-gateway.conf || -f /etc/nginx/http.d/vpn-ws-gateway.conf ]]; then
+    if [[ "$reload_cmd" == "true" ]]; then
+      reload_cmd="systemctl reload-or-restart nginx"
+    else
+      reload_cmd="$reload_cmd; systemctl reload-or-restart nginx"
+    fi
   fi
   "$ACME_BIN" --install-cert -d "$domain" \
     --key-file "$dest/key.pem" \
@@ -305,6 +319,14 @@ ssl_renew() {
     "$ACME_BIN" --renew --force --server "$ACME_SERVER_DEFAULT"
   else
     "$ACME_BIN" --renew --server "$ACME_SERVER_DEFAULT"
+  fi
+  # v5: acme.sh --renew triggers the --reloadcmd hook already (xray + nginx
+  # reload-or-restart), but re-apply the gateway cert pick-up best-effort in case
+  # the hook was installed before the gateway existed (new cert now on disk).
+  if declare -F edge_refresh_tls >/dev/null 2>&1; then
+    edge_refresh_tls || true
+  elif command -v nginx &>/dev/null && [[ -f /etc/nginx/conf.d/vpn-ws-gateway.conf || -f /etc/nginx/http.d/vpn-ws-gateway.conf ]]; then
+    systemctl reload-or-restart nginx 2>/dev/null || true
   fi
 }
 

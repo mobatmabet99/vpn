@@ -49,10 +49,11 @@
 | Feature | Detail |
 |---|---|
 | 🔌 **Main protocol** | WireGuard (ChaCha20-Poly1305, MTU 1420) with auto server + client keypair, Pre-Shared Key (PSK), client `.conf` files & QR Code (PNG + ANSI terminal) |
-| 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket (port 80). Account management: `add-ssh-user.sh` / `remove-ssh-user.sh` (with expiry) |
-| ⚡ **Xray-core (default ON)** | v26.3.27 stable — 5 inbounds at once: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID works for all protocols + auto links & QR |
+| 🔑 **SSH VPN (default ON)** | OpenSSH hardening + Dropbear (port 143) + SSH over TLS/Stunnel (port 444) + SSH over WebSocket via v5 gateway (`ws://IP:80/ssh-ws`, `ws://IP:8080/ssh-ws`, `wss://IP:8443/ssh-ws`, `wss://IP:443/ssh-ws`; localhost backend 10080). Account management: `add-ssh-user.sh` / `remove-ssh-user.sh` (with expiry) |
+| ⚡ **Xray-core v5 (default ON)** | v26.10.10 stable (Oct 2026) — **13 inbounds at once**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443, fallback → 8443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**, **VMess/VLESS/Trojan XHTTP localhost (10009-10011, via gateway 80/8080/443/8443)**, **VLESS REALITY XHTTP (10012)**. 1 UUID works for all protocols + auto links & QR. **gRPC = HTTP/2 based, very smooth on Debian 13 & Ubuntu 26, great for CDN/reverse proxy** |
 | 🔄 **Alternative engine** | v2ray-core v5.53.0 (switch via `--with-v2ray` or `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, `.ovpn` profile) as SSH replacement |
 | 👻 **Shadowsocks (optional)** | shadowsocks-rust v1.25.0, AEAD-2022 cipher `2022-blake3-aes-256-gcm` + `ss://` URI + QR |
+| 🌐 **Unified gateway + WG-WS + AmneziaWG (v5)** | **Nginx WS gateway**: `80/8080` plain + `8443` TLS (acme.sh/self-signed) + `443` via REALITY fallback → Xray WS (10001-10003), XHTTP localhost (10009-10011), SSH-WS (10080), WG-WS (10081). **WireGuard over WebSocket** via wstunnel v11 (`/wg-ws`, pure WG 51820 untouched). **AmneziaWG** anti-DPI second interface `awg0:51821/udp` (menus 28/29 + `add/remove-amneziawg-user.sh`) |
 | 🔒 **Auto SSL (v4.7)** | TLS certificates via **acme.sh** (lightweight, no heavy Python) — **Standalone** mode (temporary port 80) or **Cloudflare DNS API** (CDN/firewall-proof). Auto-renew via cron, stored in `/etc/vpn-ssl/<domain>/` for Xray TLS / Stunnel / Nginx. acme.sh **pre-installed by default** during `install.sh` (disable via `--no-ssl`) — issue certs via Menu 24 / `./setup-ssl.sh` |
 | 🛡️ **Robustness (v4.8)** | **Strict mode** (`set -euo pipefail` + `|| die`) in all scripts, **port-conflict checks** (process owner via `ss`/`lsof`, `/proc/net` fallback) for SSH/Xray/OpenVPN/Shadowsocks/Web/SSL, and **temp auto-cleanup** via `EXIT/INT/TERM` trap — mid-install failures leave no junk. |
 | ⚙️ **Systemd + summary (v4.9)** | **Test-before-restart** (`xray run -test` / `sshd -t` must pass before `systemctl restart`) + **auto-start on boot** for all services + `enabled:` column in `status.sh`. Every account **printed + saved** to `/etc/vpn-script/client-config.txt` (mode 600) + **QR via qrencode** — re-show via `./show-account.sh [user] --qr` (menu 25) |
@@ -60,7 +61,7 @@
 | 🌐 **IP Forwarding** | Enables `net.ipv4.ip_forward=1` + IPv6 forwarding persistently (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
 | 🔀 **NAT / Masquerade** | Automatic `iptables ... -j MASQUERADE` via WireGuard `PostUp`/`PostDown` so client internet works |
-| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `show-account.sh` (v4.9), `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-25), `uninstall.sh`, plus libraries in `lib/` (including `lib/lang.sh`, `lib/limits.sh`) |
+| 📦 **Modular** | `install.sh`, `add-client.sh`, `remove-client.sh`, `list-clients.sh`, `show-qr.sh`, `show-account.sh`, `add-ssh-user.sh`, `remove-ssh-user.sh`, `add-xray-user.sh`, `remove-xray-user.sh`, `add-amneziawg-user.sh`, `remove-amneziawg-user.sh`, `check-limits.sh`, `status.sh`, `menu.sh` (0-29), `uninstall.sh`, plus libraries in `lib/` (including `lib/lang.sh`, `lib/limits.sh`, `lib/edge.sh`, `lib/wstunnel.sh`, `lib/amneziawg.sh`) |
 | 🌐 **Trilingual (v1.4)** | English default, Indonesian + Chinese optional. Single codebase via `T "English" "Indonesia" "中文"` in `lib/lang.sh`, saved in `/etc/vpn/lang` |
 | ⚠️ **Error handling** | Requires root/sudo, checks `/dev/net/tun`, OS detection + untested-distro warning, port & dependency checks, client/user name validation, old-config backup |
 | ⏱️ **Limits & suspend (v1.2)** | Concurrent IP + monthly bandwidth GB limit per account (default 2 IPs & 100 GB). Multi-login over limit = 5-minute auto-suspend + auto-clear sessions. `vpn-limits` systemd monitor every 60 seconds |
@@ -76,30 +77,36 @@ vpn/
 ├── remove-client.sh        # Remove WireGuard client (+ cleans limit data)
 ├── list-clients.sh         # List WG clients + traffic stats & handshake
 ├── show-qr.sh              # Re-show client WG QR Code / .conf
+├── show-account.sh         # Re-show saved summary (all users / one user + --qr)
 ├── add-ssh-user.sh         # Create SSH VPN account (expiry + IP & bandwidth limit)
 ├── remove-ssh-user.sh      # Remove SSH VPN account (+ cleans limit data)
 ├── add-xray-user.sh        # Create Xray/V2Ray user + IP & bandwidth limit
 ├── remove-xray-user.sh     # Remove Xray/V2Ray user (+ cleans limit data)
+├── add-amneziawg-user.sh   # (v5) Create AmneziaWG client + QR
+├── remove-amneziawg-user.sh # (v5) Remove AmneziaWG client
 ├── check-limits.sh         # Show IP limits, quota, active IPs & suspend status
-├── status.sh               # Diagnostics: services, forwarding, TUN, NAT, firewall, limits
-├── menu.sh                 # Interactive menu 0-17 (wrwb Store control panel)
-├── uninstall.sh            # Fully remove VPN install (+ limit monitor, + /etc/vpn/lang)
+├── status.sh               # Diagnostics: services (+enabled/auto-start), forwarding, TUN, NAT, firewall, limits, SSL, saved summary
+├── menu.sh                 # Interactive menu 0-29 (wrwb Store control panel, incl. v5 gateway + show-account)
+├── uninstall.sh            # Fully remove VPN install (+ limit monitor, + /etc/vpn/lang, + /etc/vpn-script)
 ├── README.md               # Indonesian docs
 ├── README.en.md            # English docs (default, this file)
 ├── README.zh.md            # Chinese docs (简体中文)
-├── CHANGELOG-v1.2.md       # v1.2 release notes (IP & bandwidth limits)
-├── CHANGELOG-v1.3.md       # v1.3 release notes (bilingual EN/ID)
-├── CHANGELOG-v1.4.md       # v1.4 release notes (trilingual EN/ID/ZH)
+├── CHANGELOG.md            # Release summary v1.2 to v5
+├── changelogs/             # Per-version details (v4.0-v4.2.md ... v5.md)
 ├── lib/
 │   ├── lang.sh             # v1.4 trilingual core: T "EN" "ID" "ZH", /etc/vpn/lang
 │   ├── common.sh           # Logging, OS detect, validation, network helpers, params
 │   ├── system.sh           # Package install, IP forwarding, firewall (UFW/firewalld)
 │   ├── wireguard.sh        # WireGuard core: server conf, IP alloc, client CRUD
 │   ├── ssh.sh              # SSH module: OpenSSH+Dropbear+Stunnel+WebSocket, account CRUD
-│   ├── xray.sh             # Xray/V2Ray module: VMess/VLESS/Trojan+XTLS/REALITY
+│   ├── xray.sh             # Xray/V2Ray module: VMess/VLESS/Trojan+XTLS/REALITY+gRPC+XHTTP
 │   ├── limits.sh           # v1.2 module: IP & bandwidth limits + 5-min auto-suspend
 │   ├── openvpn.sh          # Alternative OpenVPN + Easy-RSA module
-│   └── shadowsocks.sh      # Optional Shadowsocks-rust module
+│   ├── shadowsocks.sh      # Optional Shadowsocks-rust module
+│   ├── ssl.sh              # acme.sh SSL module + gateway refresh
+│   ├── edge.sh             # (v5) Nginx WS gateway 80/8080/8443 + 443 fallback
+│   ├── wstunnel.sh         # (v5) WireGuard-over-WebSocket via wstunnel
+│   └── amneziawg.sh        # (v5) AmneziaWG anti-DPI (awg0:51821)
 ├── .gitattributes          # Forces LF endings so scripts stay safe on Linux
 ```
 
@@ -115,7 +122,7 @@ Generated config files on the server:
 /etc/vpn/lang                      # v1.4 language choice ("en" / "id" / "zh")
 /etc/ssh-vpn/params                # SSH/Dropbear/TLS/WS ports + public IP
 /etc/ssh-vpn/accounts.db           # SSH account DB (user:created:expiry)
-/etc/xray/config.json              # Xray/V2Ray config (5 inbounds)
+/etc/xray/config.json              # Xray/V2Ray config (13 inbounds xray / 7 inbounds v2ray)
 ```
 
 ```
@@ -131,7 +138,7 @@ Generated config files on the server:
 2. **Root access** — all scripts must run as root / via `sudo`.
 3. **TUN device** available (`/dev/net/tun`). Almost all KVM VPS have it. For OpenVZ/LXC, enable TUN in the provider panel first.
 4. **Internet** on the server for package downloads (apt/dnf) and GitHub binaries (Xray/Shadowsocks).
-5. **Free & open ports** in the cloud firewall: UDP 51820 (WireGuard), TCP 22/80/143/444 (SSH), TCP 443/10001-10004 (Xray).
+5. **Free & open ports** in the cloud firewall: UDP 51820 (WireGuard), UDP 51821 (AmneziaWG v5), TCP 22/143/444 (SSH), TCP 80/8080/8443 (v5 gateway) + TCP 443/10001-10008/10012 (Xray).
 6. **Python 3** on the server (usually pre-installed; used by Xray module for safe JSON edits).
 
 ---
@@ -218,10 +225,11 @@ See all options:
 8. Opens WireGuard UDP port via dynamic firewall (UFW / firewalld / nftables / iptables).
 9. Generates server keypair, writes `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), saves `params`.
 10. Creates first WireGuard client + `.conf` + QR Code, then enables & starts `wg-quick@wg0`.
-11. **Installs SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + WebSocket:80.
-12. **Installs Xray-core** (default): 5 inbounds VMess/VLESS/Trojan + XTLS-Vision + REALITY:443 + connection links & QR.
-13. (Optional) OpenVPN / Shadowsocks when requested.
-14. Shows summary + quick commands.
+11. **Installs SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + SSH-WS localhost 10080 via v5 gateway (80/8080/8443/443).
+12. **Installs Xray-core v5** (default): 13 inbounds (xray) / 7 inbounds (v2ray) — VMess/VLESS/Trojan WS + gRPC + XHTTP + XTLS-Vision + REALITY:443 + links & QR.
+13. **Installs wstunnel + Nginx gateway + AmneziaWG (v5)**: WG-WS 10081, gateway 80/8080/8443 + 443 fallback, AWG `awg0:51821/udp`.
+14. (Optional) OpenVPN / Shadowsocks when requested.
+15. Shows summary + quick commands.
 
 ### 4. Alternative: interactive menu
 
@@ -230,7 +238,7 @@ sudo ./menu.sh
 sudo ./menu.sh --lang zh   # force Chinese for this run
 ```
 
-Menu 0–17: install WG, add/remove WG client, show QR, list clients, check status, install SSH / OpenVPN / Xray / V2Ray / Shadowsocks, manage SSH accounts, manage Xray users, restart services, check limits, switch language (17), uninstall.
+Menu 0-29: install WG, add/remove WG client, show QR, list clients, check status, install SSH / OpenVPN / Xray / V2Ray / Shadowsocks, manage SSH accounts, manage Xray users, restart services, check limits, switch language (17), uninstall, v5 gateway (26-29), Telegram/Bot/Dashboard/Backup (19-24).
 
 ---
 
@@ -254,7 +262,7 @@ Name rule: letters, numbers, `-`, `_` only, max 32 chars.
 
 ## 🔑 SSH VPN — Manage Accounts
 
-Default second service after WireGuard. Ports: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS **80**.
+Default second service after WireGuard. Ports: OpenSSH **22**, Dropbear **143**, SSH-over-TLS **444**, SSH-over-WS via v5 gateway (`ws://IP:80/ssh-ws`, `ws://IP:8080/ssh-ws`, `wss://IP:8443/ssh-ws`, `wss://IP:443/ssh-ws`).
 
 ```bash
 sudo ./add-ssh-user.sh                    # interactive (asks IP & bandwidth limit)
@@ -274,27 +282,57 @@ For tunneling apps (HTTP Custom, etc.): use host `SERVER-IP`, WS port `80` with 
 
 ---
 
-## ⚡ Xray / V2Ray — Manage Users (VMess / VLESS / Trojan + XTLS / REALITY)
+## ⚡ Xray / V2Ray v5 — Manage Users (VMess / VLESS / Trojan + XTLS / REALITY + gRPC + XHTTP + Gateway)
 
-One user = 1 UUID active on **all 5 inbounds**:
+One user = 1 UUID active on **all 13 inbounds (xray engine)** or **7 inbounds (v2ray engine)**:
 
 | # | Protocol | Port | Best for |
 |---|---|---|---|
-| 1 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Primary** — most efficient & anti-blocking, no own domain/TLS needed (SNI `www.microsoft.com`) |
-| 2 | VLESS + TCP + XTLS-Vision | 10004 | Fast on clean networks / behind own TLS terminator |
-| 3 | VMess + WebSocket (`/vmess`) | 10001 | Old-client compatibility |
-| 4 | VLESS + WebSocket (`/vless`) | 10002 | Behind CDN/reverse-proxy (Cloudflare etc.) |
-| 5 | Trojan + WebSocket (`/trojan`) | 10003 | HTTPS-traffic disguise |
+| 1 | **VLESS + XHTTP + REALITY** | 10012 | **🏆 BEST** — most HTTP-like, ultimate stealth |
+| 2 | **VLESS + TCP + XTLS-Vision + REALITY** | 443 | **Primary** — most efficient & anti-blocking, no own domain/TLS needed (SNI `www.microsoft.com`) + WS-TLS fallback → 8443 |
+| 3 | VLESS + gRPC + REALITY | 10008 | **Best for heavy censorship + CDN** — HTTP/2, very stable on Debian 13/Ubuntu 26 |
+| 4 | VLESS + TCP + XTLS-Vision | 10004 | Fast on clean networks / behind own TLS terminator |
+| 5-7 | VMess/VLESS/Trojan + XHTTP via gateway | 80/8080/8443/443 | HTTP stealth via Nginx (`/vmess-xhttp`, `/vless-xhttp`, `/trojan-xhttp`) |
+| 8-10 | VMess/VLESS/Trojan + WebSocket | 10001-10003 direct / 80/8080 gateway | Old-client compatibility + behind CDN |
+| 11-13 | VMess/VLESS/Trojan + gRPC | 10005-10007 | HTTP/2, efficient, CDN/Nginx/Caddy friendly |
+
+| # | Protocol (v2ray engine — 7 inbounds) | Port | Best for |
+|---|---|---|---|
+| 1 | VLESS + plain TCP | 10004 | Fast on clean networks / behind own TLS terminator |
+| 2-4 | VMess/VLESS/Trojan + WebSocket (`/vmess` `/vless` `/trojan`) | 10001-10003 | Old-client compatibility + behind CDN |
+| 5-7 | VMess/VLESS/Trojan + gRPC (`VMessGRPC`/`VLessGRPC`/`TrojanGRPC`) | 10005-10007 | HTTP/2, efficient, CDN/Nginx/Caddy friendly |
 
 ```bash
-sudo ./add-xray-user.sh phone-andi       # create user + print 5 links + REALITY QR (default limit)
+sudo ./add-xray-user.sh phone-andi       # create user + print links + QR (default limit)
 sudo ./add-xray-user.sh phone-andi 3 200 # create user with 3 IPs / 200 GB limit
 sudo ./remove-xray-user.sh phone-andi    # remove from all inbounds
 ```
 
-Recommended client apps: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Priority: **VLESS REALITY > VLESS XTLS > VMess/VLESS/Trojan WS**. Copy the link starting `vless://...security=reality...` for best results.
+Recommended client apps: Android **v2rayNG / NekoBox**, iOS **Streisand / FoXray / Shadowrocket**, Desktop **Nekoray / Hiddify**. Priority v5: **VLESS XHTTP+REALITY (10012) > VLESS TCP+REALITY (443) > VLESS gRPC+REALITY (10008) > VLESS XTLS (10004) > XHTTP via gateway > gRPC > WS**. Copy the link starting `vless://...security=reality...` for best results.
 
-Switch default engine (`xray` → `v2ray`) at install: `sudo ./install.sh --with-v2ray --yes` or `XRAY_ENGINE=v2ray sudo ./install.sh --yes`.
+Switch default engine (`xray` → `v2ray`) at install: `sudo ./install.sh --with-v2ray --yes` or `XRAY_ENGINE=v2ray sudo ./install.sh --yes`. v2ray engine = 7 inbounds (3× WS + 3× gRPC + 1× plain TCP, no REALITY/XHTTP/XTLS-Vision).
+
+---
+
+## 🌐 v5 Gateway — Nginx 80/8080/8443 + 443 Fallback, WG-WS & AmneziaWG
+
+One Nginx gateway serves all WS/XHTTP without double configs (menu **26**):
+
+| Port | Nature | Routing |
+|---|---|---|
+| `80/tcp` | plain non-TLS | `/vmess /vless /trojan` → 10001-10003, `/vmess-xhttp /vless-xhttp /trojan-xhttp` → 10009-10011, `/ssh-ws` → 10080, `/wg-ws` → 10081 |
+| `8080/tcp` | alt plain | same routing (+ legacy `/` for old SSH-WS clients) |
+| `8443/tcp` | TLS (acme.sh when present, else 10-year self-signed) | same routing via `wss://` |
+| `443/tcp` | VLESS TCP REALITY + fallback → 8443 | WS-TLS via 443 uses `security=tls` + gateway SNI (NOT reality pbk/sid) |
+
+**WireGuard over WebSocket** (menu **27**): `WG client → wstunnel client → WS/WSS (80/8080/443/8443) → Nginx /wg-ws → wstunnel 127.0.0.1:10081 → local WG 51820`. Pure UDP WG 51820 untouched.
+
+**AmneziaWG anti-DPI** (menus **28/29**): second interface `awg0:51821/udp` + auto `Jc/Jmin/Jmax/S1/S2/H1-H4` obfuscation:
+
+```bash
+sudo ./add-amneziawg-user.sh phone-awg       # create client + QR (default limit)
+sudo ./remove-amneziawg-user.sh phone-awg    # remove client
+```
 
 ---
 
@@ -383,7 +421,7 @@ sudo ./uninstall.sh
 - **Change VPN subnet:** edit `DEFAULT_SUBNET`/`DEFAULT_SERVER_IP` in `install.sh` and `base_v4`/`base_v6` in `lib/wireguard.sh` (keep consistent in `wg_write_server_conf` and `wg_get_next_ip`).
 - **Change default DNS:** edit `DEFAULT_DNS` in `install.sh`.
 - **Change default language:** no code edit needed — use `--lang en|id|zh`, `VPN_LANG=zh`, or menu 17. File: `/etc/vpn/lang`.
-- **Change Xray/V2Ray version:** edit `XRAY_VERSION_DEFAULT` (`v26.3.27`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) in `lib/xray.sh` — check latest at [Xray-core releases](https://github.com/XTLS/Xray-core/releases) and [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
+- **Change Xray/V2Ray version:** edit `XRAY_VERSION_DEFAULT` (`v26.10.10`) / `V2RAY_VERSION_DEFAULT` (`v5.53.0`) in `lib/xray.sh` — check latest at [Xray-core releases](https://github.com/XTLS/Xray-core/releases) and [v2ray-core releases](https://github.com/v2fly/v2ray-core/releases).
 - **Change Xray inbound ports:** edit `XPORT_VMESS_WS` / `XPORT_VLESS_WS` / `XPORT_TROJAN_WS` / `XPORT_VLESS_XTLS` / `XPORT_VLESS_REALITY` in `lib/xray.sh` before install.
 - **Change REALITY SNI:** edit `XREALITY_SNI_DEFAULT` / `XREALITY_DEST_DEFAULT` in `lib/xray.sh` (needs: foreign domain, TLSv1.3 + H2, no redirect).
 - **Change Shadowsocks version:** edit `SS_VERSION_DEFAULT` in `lib/shadowsocks.sh` (default: `v1.25.0`, see [shadowsocks-rust releases](https://github.com/shadowsocks/shadowsocks-rust/releases)).
@@ -420,4 +458,4 @@ Thank you for your support! 🙏
 Free for personal and commercial use. Provided "as is" without warranty. Ensure compliance with your network provider's laws/ToS when running a VPN service.
 
 ---
-Made by **wrwb Store** — v1.4 (Trilingual EN/ID/ZH, default English + 2-IP & 100-GB limits, 5-min auto-suspend).
+Made by **wrwb Store** — v5 (Unified 80/443+8080/8443 gateway + WG-WS + AmneziaWG + 2-IP & 100-GB limits, 5-min auto-suspend).
