@@ -10,6 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/system.sh
+source "$SCRIPT_DIR/lib/system.sh"
 
 need_root
 
@@ -112,7 +114,7 @@ EOF
 
 # Open firewall port
 log_info "Opening firewall port $WEB_PORT..."
-open_firewall_port "$WEB_PORT" "tcp"
+open_firewall_port "$WEB_PORT" "tcp" "Web-Dashboard"
 
 # Enable and start service
 systemctl daemon-reload

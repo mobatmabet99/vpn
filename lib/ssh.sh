@@ -128,7 +128,7 @@ EOF
     systemctl restart dropbear || true
   fi
 
-  open_firewall_port "$port" "tcp"
+  open_firewall_port "$port" "tcp" "SSH-Dropbear"
   log_success "$(T "Dropbear configured on port $port." "Dropbear dikonfigurasi di port $port." "Dropbear 已配置在端口 $port。")"
 }
 
@@ -191,7 +191,7 @@ EOF
   systemctl enable stunnel4 >/dev/null 2>&1 || true
   systemctl restart stunnel4
 
-  open_firewall_port "$ssl_port" "tcp"
+  open_firewall_port "$ssl_port" "tcp" "SSH-TLS"
   log_success "$(T "Stunnel active: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel aktif: port $ssl_port (TLS) -> SSH $ssh_port." "Stunnel 运行中：端口 $ssl_port（TLS）-> SSH $ssh_port。")"
 }
 
@@ -297,7 +297,7 @@ EOF
   systemctl enable ssh-ws >/dev/null 2>&1 || true
   systemctl restart ssh-ws
 
-  open_firewall_port "$ws_port" "tcp"
+  open_firewall_port "$ws_port" "tcp" "SSH-WS"
   log_success "$(T "SSH WebSocket bridge is active on port $ws_port." "SSH WebSocket bridge aktif di port $ws_port." "SSH WebSocket 桥接已在端口 $ws_port 运行。")"
 }
 
@@ -314,7 +314,7 @@ ssh_setup_server() {
   ssh_setup_stunnel "$ssl_port" "$ssh_port"
   ssh_setup_websocket "$ws_port" "$ssh_port"
 
-  open_firewall_port "$ssh_port" "tcp"
+  open_firewall_port "$ssh_port" "tcp" "SSH"
 
   cat > "$SSH_PARAMS" <<EOF
 SSH_PUB_IP="$pub_ip"

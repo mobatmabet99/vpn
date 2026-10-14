@@ -53,7 +53,7 @@
 | ⚡ **Xray-core (默认开启)** | v26.3.27 稳定版 — 5 个入站同时运行：VMess WS (10001)、VLESS WS (10002)、Trojan WS (10003)、VLESS TCP XTLS-Vision (10004)、**VLESS TCP XTLS-Vision + REALITY (443)**。1 个 UUID 通用于所有协议 + 自动生成链接与二维码 |
 | 🔄 **备用引擎** | v2ray-core v5.53.0 (通过 `--with-v2ray` 或 `XRAY_ENGINE=v2ray` 切换)；OpenVPN 2.7/2.6 (加密 `AES-256-GCM` + `CHACHA20-POLY1305`，认证 `SHA512`，TLS 最低 1.3，`.ovpn` 配置) 可替代 SSH |
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
-| 🛡️ **自动防火墙** | 在 **UFW** (Debian/Ubuntu) 或 **firewalld** (RHEL/Rocky) 中开放所有 VPN 端口 (UDP + TCP) |
+| 🛡️ **自动防火墙** | 检测活动的防火墙后端（**UFW** / **firewalld** / **nftables** / **iptables**），仅在包过滤启用时开放 VPN 端口 — 幂等，无重复规则 |
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |
 | 🔀 **NAT / 伪装** | 通过 WireGuard `PostUp`/`PostDown` 自动添加 `iptables ... -j MASQUERADE`，保证客户端正常上网 |
@@ -208,7 +208,7 @@ XRAY_ENGINE=v2ray sudo ./install.sh --yes
 5. 询问/使用参数 (端口、DNS、客户端名、SSH-vs-OpenVPN、Xray-vs-V2Ray)。
 6. 校验端口与客户端名，检查 UDP 端口是否被占用。
 7. 安装 WireGuard 软件包 + 启用 IP 转发与吞吐优化 (BBR、TCP 缓冲)。
-8. 在 UFW / firewalld 开放 WireGuard UDP 端口。
+8. 通过动态防火墙 (UFW / firewalld / nftables / iptables) 开放 WireGuard UDP 端口。
 9. 生成服务端密钥对，写入 `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`)，保存 `params`。
 10. 创建首个 WireGuard 客户端 + `.conf` + 二维码，然后启用并启动 `wg-quick@wg0`。
 11. **安装 SSH VPN** (默认)：OpenSSH 加固 + Dropbear:143 + Stunnel:444 + WebSocket:80。
@@ -346,8 +346,8 @@ sudo ./uninstall.sh
   iptables -t nat -I POSTROUTING -o <主网卡> -j MASQUERADE
   ```
   (另有 `ip6tables` 对应规则)，`PostDown` 自动清理。
-- **UFW：** 启用时开放所有端口 + `DEFAULT_FORWARD_POLICY` 改为 `ACCEPT`。
-- **firewalld：** 启用时开放所有端口 + 永久 `masquerade`。
+- **UFW：** 启用时开放所有端口（单次批量 reload） + `DEFAULT_FORWARD_POLICY` 改为 `ACCEPT`。
+- **firewalld：** 启用时开放所有端口 + 永久 `masquerade`（单次批量 reload）。**纯 nftables/iptables 后端：** 仅在包过滤启用时添加 ACCEPT 规则 — 当所有策略为 ACCEPT（VPS 默认）时，不添加任何规则。
 
 ---
 

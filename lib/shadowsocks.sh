@@ -112,8 +112,8 @@ EOF
   systemctl restart shadowsocks-rust.service
 
   # Open TCP & UDP in the firewall
-  open_firewall_port "$port" "tcp"
-  open_firewall_port "$port" "udp"
+  open_firewall_port "$port" "tcp" "Shadowsocks"
+  open_firewall_port "$port" "udp" "Shadowsocks"
 
   # Save parameters
   cat > "$SS_PARAMS" <<EOF

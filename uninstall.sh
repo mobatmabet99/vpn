@@ -92,9 +92,7 @@ if [[ -d /etc/ssh-vpn ]] || systemctl list-unit-files 2>/dev/null | grep -qE "^(
   if [[ -f /etc/ssh-vpn/params ]]; then
     # shellcheck disable=SC1091
     source /etc/ssh-vpn/params
-    close_firewall_port "${DROPBEAR_PORT:-143}" "tcp"
-    close_firewall_port "${SSL_PORT:-444}" "tcp"
-    close_firewall_port "${WS_PORT:-80}" "tcp"
+    close_firewall_ports "tcp" "${DROPBEAR_PORT:-143}" "${SSL_PORT:-444}" "${SSH_PORT:-22}" "${WS_PORT:-8080}"
   fi
   for svc in dropbear stunnel4 ssh-ws; do
     systemctl stop "$svc" 2>/dev/null || true
@@ -117,9 +115,7 @@ if [[ -d /etc/xray ]] || systemctl list-unit-files 2>/dev/null | grep -q "^xray\
   if [[ -f /etc/xray/params ]]; then
     # shellcheck disable=SC1091
     source /etc/xray/params
-    for p in "${XPORT_VMESS_WS:-10001}" "${XPORT_VLESS_WS:-10002}" "${XPORT_TROJAN_WS:-10003}" "${XPORT_VLESS_XTLS:-10004}" "${XPORT_VLESS_REALITY:-443}"; do
-      close_firewall_port "$p" "tcp"
-    done
+    close_firewall_ports "tcp" "${XPORT_VMESS_WS:-10001}" "${XPORT_VLESS_WS:-10002}" "${XPORT_TROJAN_WS:-10003}" "${XPORT_VLESS_XTLS:-10004}" "${XPORT_VLESS_REALITY:-443}" "${XPORT_VMESS_GRPC:-10005}" "${XPORT_VLESS_GRPC:-10006}" "${XPORT_TROJAN_GRPC:-10007}" "${XPORT_VLESS_REALITY_GRPC:-10008}" "${XPORT_XHTTP_SHARED:-80}"
   fi
   rm -rf /etc/xray /usr/local/bin/xray /usr/local/share/xray
   log_success "$(T "Xray/V2Ray cleaned up." "Xray/V2Ray dibersihkan." "Xray/V2Ray 已清理。")"

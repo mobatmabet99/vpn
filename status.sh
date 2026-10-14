@@ -12,6 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/system.sh
+source "$SCRIPT_DIR/lib/system.sh"
 
 need_root
 detect_os
@@ -124,9 +126,10 @@ if [[ -f /etc/xray/params ]] || systemctl list-unit-files 2>/dev/null | grep -q 
   fi
 fi
 
-# 5. Firewall & NAT rules
+# 5. Firewall & NAT rules (dynamic backend, v4.6)
 echo "--------------------------------------------------------------------------------"
 echo -e "${_C_BOLD}$(T "FIREWALL & NAT (MASQUERADE):" "FIREWALL & NAT (MASQUERADE):" "防火墙与 NAT (MASQUERADE)：")${_C_RESET}"
+fw_status_summary
 if command -v ufw &>/dev/null; then
   echo "$(T "UFW status            : $(ufw status 2>/dev/null | grep -i "Status:" || echo "N/A")" "UFW Status            : $(ufw status 2>/dev/null | grep -i "Status:" || echo "N/A")" "UFW 状态              : $(ufw status 2>/dev/null | grep -i "Status:" || echo "N/A")")"
 fi

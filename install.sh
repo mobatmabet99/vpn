@@ -284,7 +284,7 @@ main() {
   enable_ip_forwarding
 
   # 9. Open firewall port
-  open_firewall_port "$SERVER_PORT" "udp"
+  open_firewall_port "$SERVER_PORT" "udp" "WireGuard"
 
   # 10. Generate WireGuard server keys
   wg_generate_server_keys

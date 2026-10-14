@@ -85,7 +85,7 @@ EOF
   echo " [23] $(T "Install ALL v4 Features" "Instal SEMUA Fitur v4" "安装所有 v4 功能")"
   echo " [0]  $(T "Exit" "Keluar" "退出")"
   echo "================================================================"
-  echo " $(T "by wrwb Store v4.1" "Dibuat oleh wrwb Store v4.1" "由 wrwb Store 打造 v4.1")"
+  echo " $(T "by wrwb Store v4.6" "Dibuat oleh wrwb Store v4.6" "由 wrwb Store 打造 v4.6")"
 }
 
 pause() {

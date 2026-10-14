@@ -53,7 +53,7 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | ⚡ **Xray-core v4 (default ON)** | v26.10.10 stabil (Okt 2026) — **9 inbound sekaligus**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis. **gRPC = HTTP/2 based, sangat lancar di Debian 13 & Ubuntu 26, cocok untuk CDN/reverse proxy** |
 | 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
-| 🛡️ **Firewall otomatis** | Membuka semua port VPN (UDP + TCP) di **UFW** (Debian/Ubuntu) atau **firewalld** (RHEL/Rocky) |
+| 🛡️ **Firewall otomatis** | Mendeteksi backend firewall aktif (**UFW** / **firewalld** / **nftables** / **iptables**) dan membuka port VPN hanya bila filtering aktif — idempotent, tanpa aturan duplikat |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
 | 🔀 **NAT / Masquerade** | Aturan `iptables ... -j MASQUERADE` otomatis via `PostUp`/`PostDown` WireGuard agar internet client berjalan |
@@ -213,7 +213,7 @@ Lihat semua opsi:
 5. Tanya/pakai parameter (port, DNS, nama client, pilihan SSH-vs-OpenVPN, pilihan Xray-vs-V2Ray).
 6. Validasi port & nama client, lalu cek apakah port UDP sudah dipakai aplikasi lain.
 6. Instal paket WireGuard + aktifkan IP forwarding & optimasi throughput (BBR, buffer TCP).
-7. Buka port UDP WireGuard di UFW / firewalld.
+7. Buka port UDP WireGuard via firewall dinamis (UFW / firewalld / nftables / iptables).
 8. Generate server keypair, tulis `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), simpan `params`.
 9. Buat client WireGuard pertama + `.conf` + QR Code, lalu enable & start `wg-quick@wg0`.
 10. **Pasang SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + WebSocket:80.
@@ -357,8 +357,8 @@ sudo ./uninstall.sh
   iptables -t nat -I POSTROUTING -o <iface-utama> -j MASQUERADE
   ```
   (plus padanannya untuk `ip6tables`), dan dibersihkan otomatis di `PostDown`.
-- **UFW:** bila aktif, semua port dibuka + `DEFAULT_FORWARD_POLICY` diubah ke `ACCEPT`.
-- **firewalld:** bila aktif, semua port dibuka + `masquerade` permanen.
+- **UFW:** bila aktif, semua port dibuka (satu reload batch) + `DEFAULT_FORWARD_POLICY` diubah ke `ACCEPT`.
+- **firewalld:** bila aktif, semua port dibuka + `masquerade` permanen (satu reload batch). **Backend nftables/iptables murni:** aturan ACCEPT ditambahkan hanya bila filtering aktif — bila semua policy ACCEPT (VPS default), tidak ada aturan yang ditambahkan.
 
 ---
 

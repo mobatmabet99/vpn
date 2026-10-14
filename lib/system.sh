@@ -194,59 +194,257 @@ install_wireguard_packages() {
   log_success "$(T "WireGuard dependencies installed." "Dependensi WireGuard berhasil diinstal." "WireGuard 依赖安装成功。")"
 }
 
-# ----------------------------------------------------------- Firewall
-open_firewall_port() {
-  local port="$1" proto="${2:-udp}"
-  log_step "$(T "Configuring firewall for port $port/$proto..." "Mengonfigurasi firewall untuk port $port/$proto..." "正在为端口 $port/$proto 配置防火墙...")"
+# ----------------------------------------------------------- Firewall (dynamic, v4.6)
+# Auto-detect the active packet-filtering backend (UFW / firewalld / nftables
+# / iptables) and only add rules where filtering is actually enforced.
+# All helpers are idempotent: re-running never creates duplicate rules.
 
-  # 1. Check UFW (Ubuntu/Debian)
+# Detect the best backend. Sets FW_BACKEND to: ufw | firewalld | iptables | nft | none
+fw_detect_backend() {
+  if [[ "${FW_DETECTED:-0}" == "1" && -n "${FW_BACKEND:-}" ]]; then
+    return 0
+  fi
+  FW_BACKEND="none"
+  FW_UFW_ACTIVE=0
+  FW_FIREWALLD_ACTIVE=0
+
   if command -v ufw &>/dev/null; then
-    local ufw_status
-    ufw_status="$(ufw status 2>/dev/null | grep -i "Status:" | awk '{print $2}' || echo "inactive")"
-    if [[ "$ufw_status" == "active" ]]; then
-      log_info "$(T "UFW is active: opening port $port/$proto..." "UFW aktif: membuka port $port/$proto..." "UFW 运行中：正在开放端口 $port/$proto...")"
-      ufw allow "$port/$proto" comment "VPN WireGuard" >/dev/null 2>&1 || ufw allow "$port/$proto"
-      # Ensure UFW DEFAULT_FORWARD_POLICY is ACCEPT
-      if [[ -f /etc/default/ufw ]]; then
-        if grep -q '^DEFAULT_FORWARD_POLICY="DROP"' /etc/default/ufw; then
-          log_info "$(T "Changing UFW DEFAULT_FORWARD_POLICY from DROP to ACCEPT..." "Mengubah DEFAULT_FORWARD_POLICY UFW dari DROP ke ACCEPT..." "正在将 UFW DEFAULT_FORWARD_POLICY 从 DROP 改为 ACCEPT...")"
-          sed -i 's/^DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
-        fi
+    if ufw status 2>/dev/null | grep -qi "status:[[:space:]]*active"; then
+      FW_UFW_ACTIVE=1
+      FW_BACKEND="ufw"
+    fi
+  fi
+
+  if [[ "$FW_BACKEND" == "none" ]]; then
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+      FW_FIREWALLD_ACTIVE=1
+      FW_BACKEND="firewalld"
+    fi
+  fi
+
+  if [[ "$FW_BACKEND" == "none" ]]; then
+    if command -v iptables &>/dev/null; then
+      FW_BACKEND="iptables"
+    elif command -v nft &>/dev/null; then
+      FW_BACKEND="nft"
+    fi
+  fi
+
+  FW_DETECTED=1
+  export FW_BACKEND FW_UFW_ACTIVE FW_FIREWALLD_ACTIVE FW_DETECTED
+}
+
+# Returns 0 when packet filtering is actually enforced on this host.
+fw_is_filtering_active() {
+  fw_detect_backend
+  case "$FW_BACKEND" in
+    ufw|firewalld)
+      return 0
+      ;;
+    iptables)
+      local first
+      first="$(iptables -S INPUT 2>/dev/null | head -n1 || true)"
+      case "$first" in
+        "-P INPUT DROP"|"-P INPUT REJECT")
+          return 0
+          ;;
+      esac
+      if iptables -S INPUT 2>/dev/null | grep -Eq "^-[AI] INPUT "; then
+        return 0
       fi
-      ufw reload >/dev/null 2>&1 || true
-      log_success "$(T "Port $port/$proto opened in UFW." "Port $port/$proto dibuka di UFW." "端口 $port/$proto 已在 UFW 中开放。")"
-    else
-      log_info "$(T "UFW is installed but inactive. Adding a preparatory rule..." "UFW terpasang tetapi nonaktif. Menambahkan rule persiapan..." "UFW 已安装但未运行。正在添加预备规则...")"
-      ufw allow "$port/$proto" comment "VPN WireGuard" >/dev/null 2>&1 || true
+      return 1
+      ;;
+    nft)
+      if nft list chain inet filter input 2>/dev/null | grep -Eq "dport|drop|reject"; then
+        return 0
+      fi
+      return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Ensure an ACCEPT rule exists (idempotent). Uses iptables first
+# (works on top of nftables via iptables-nft), then native nft.
+_fw_ensure_accept_rule() {
+  local port="${1:?port required}" proto="${2:-tcp}"
+  if command -v iptables &>/dev/null; then
+    iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || \
+      iptables -I INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || \
+      log_warn "$(T "Could not add iptables rule for port $port/$proto (continuing)." "Gagal menambah aturan iptables untuk port $port/$proto (lanjut)." "无法为端口 $port/$proto 添加 iptables 规则（继续）。")"
+    if command -v ip6tables &>/dev/null; then
+      ip6tables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || \
+        ip6tables -I INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || true
+    fi
+  elif command -v nft &>/dev/null; then
+    _fw_nft_ensure_accept "$port" "$proto"
+  fi
+}
+
+_fw_nft_ensure_accept() {
+  local port="${1:?port required}" proto="${2:-tcp}"
+  # Only manage the standard inet filter input chain; never create tables.
+  if ! nft list chain inet filter input >/dev/null 2>&1; then
+    log_warn "$(T "nft chain 'inet filter input' not found — skipped nft rule for port $port/$proto." "Chain nft 'inet filter input' tidak ditemukan — aturan nft port $port/$proto dilewati." "未找到 nft 链 'inet filter input' — 已跳过端口 $port/$proto 的 nft 规则。")"
+    return 0
+  fi
+  if nft list chain inet filter input 2>/dev/null | grep -Eq "${proto}[[:space:]]+dport[[:space:]]+${port}([^0-9]|$)"; then
+    return 0
+  fi
+  nft add rule inet filter input "$proto" dport "$port" accept comment "vpn" 2>/dev/null || \
+    log_warn "$(T "Could not add nft rule for port $port/$proto (continuing)." "Gagal menambah aturan nft untuk port $port/$proto (lanjut)." "无法为端口 $port/$proto 添加 nft 规则（继续）。")"
+}
+
+# Remove ACCEPT rules added by this installer (idempotent, removes duplicates).
+_fw_remove_accept_rule() {
+  local port="${1:?port required}" proto="${2:-tcp}"
+  if command -v iptables &>/dev/null; then
+    while iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null; do
+      iptables -D INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || break
+    done
+    if command -v ip6tables &>/dev/null; then
+      while ip6tables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null; do
+        ip6tables -D INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null || break
+      done
     fi
   fi
-
-  # 2. Check Firewalld (CentOS/RHEL/Rocky/Alma/Fedora/SUSE)
-  if command -v firewall-cmd &>/dev/null; then
-    if systemctl is-active --quiet firewalld 2>/dev/null; then
-      log_info "$(T "firewalld is active: adding port $port/$proto and masquerade..." "firewalld aktif: menambahkan port $port/$proto dan masquerade..." "firewalld 运行中：正在添加端口 $port/$proto 和伪装规则...")"
-      firewall-cmd --zone=public --add-port="$port/$proto" --permanent >/dev/null 2>&1 || true
-      firewall-cmd --zone=public --add-masquerade --permanent >/dev/null 2>&1 || true
-      firewall-cmd --reload >/dev/null 2>&1 || true
-      log_success "$(T "Port $port/$proto and masquerade opened in firewalld." "Port $port/$proto dan masquerade dibuka di firewalld." "端口 $port/$proto 和伪装规则已在 firewalld 中开放。")"
-    fi
+  if command -v nft &>/dev/null; then
+    _fw_nft_remove_accept "$port" "$proto"
   fi
+}
 
-  # 3. iptables fallback (when neither UFW nor firewalld is used)
+_fw_nft_remove_accept() {
+  local port="${1:?port required}" proto="${2:-tcp}"
+  if ! nft list chain inet filter input >/dev/null 2>&1; then
+    return 0
+  fi
+  local handles h
+  handles="$(nft --handle --numeric list chain inet filter input 2>/dev/null | grep -E "${proto}[[:space:]]+dport[[:space:]]+${port}([^0-9]|$)" | grep -oE "handle [0-9]+" | awk '{print $2}' || true)"
+  # shellcheck disable=SC2086
+  for h in $handles; do
+    nft delete rule inet filter input handle "$h" 2>/dev/null || true
+  done
+}
+
+# Low-level worker (no banner logging — used by single & batch open).
+_fw_allow_port() {
+  local port="${1:?port required}" proto="${2:-tcp}" label="${3:-VPN}"
+  fw_detect_backend
+  case "$FW_BACKEND" in
+    ufw)
+      ufw allow "$port/$proto" comment "$label" >/dev/null 2>&1 || ufw allow "$port/$proto" >/dev/null 2>&1 || true
+      # Ensure UFW DEFAULT_FORWARD_POLICY is ACCEPT
+      if [[ -f /etc/default/ufw ]] && grep -q '^DEFAULT_FORWARD_POLICY="DROP"' /etc/default/ufw; then
+        sed -i 's/^DEFAULT_FORWARD_POLICY="DROP"/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
+      fi
+      if [[ "${FW_BATCH:-0}" != "1" ]]; then
+        ufw reload >/dev/null 2>&1 || true
+      fi
+      ;;
+    firewalld)
+      local zone
+      zone="$(firewall-cmd --get-default-zone 2>/dev/null || echo "public")"
+      firewall-cmd --zone="$zone" --add-port="$port/$proto" --permanent >/dev/null 2>&1 || true
+      firewall-cmd --zone="$zone" --add-masquerade --permanent >/dev/null 2>&1 || true
+      if [[ "${FW_BATCH:-0}" != "1" ]]; then
+        firewall-cmd --reload >/dev/null 2>&1 || true
+      fi
+      ;;
+    iptables|nft)
+      if fw_is_filtering_active; then
+        _fw_ensure_accept_rule "$port" "$proto"
+      else
+        log_info "$(T "No active packet filtering detected — port $port/$proto is already reachable, no rule added." "Tidak ada packet filtering aktif — port $port/$proto sudah bisa dijangkau, tidak ada aturan ditambahkan." "未检测到活动包过滤 — 端口 $port/$proto 已可访问，未添加规则。")"
+      fi
+      ;;
+    *)
+      log_warn "$(T "No firewall tool found (ufw/firewalld/iptables/nft) — skipped port $port/$proto." "Tidak ada firewall tool (ufw/firewalld/iptables/nft) — port $port/$proto dilewati." "未找到防火墙工具 (ufw/firewalld/iptables/nft) — 已跳过端口 $port/$proto。")"
+      ;;
+  esac
+}
+
+open_firewall_port() {
+  local port="${1:?port required}" proto="${2:-udp}" label="${3:-VPN}"
+  log_step "$(T "Configuring firewall for port $port/$proto..." "Mengonfigurasi firewall untuk port $port/$proto..." "正在为端口 $port/$proto 配置防火墙...")"
+  _fw_allow_port "$port" "$proto" "$label"
   # The wg-quick NAT/Masquerade rules are handled automatically via PostUp/PostDown in wg0.conf
   log_success "$(T "Firewall rule for port $port/$proto is ready." "Aturan firewall port $port/$proto siap." "端口 $port/$proto 的防火墙规则已就绪。")"
 }
 
+# Open many ports with a single banner (v4.6). Usage:
+#   open_firewall_ports "Label" "tcp" 80 443 10001 10002
+open_firewall_ports() {
+  local label="${1:-VPN}" proto="${2:-tcp}"
+  if [[ $# -lt 3 ]]; then
+    log_warn "$(T "open_firewall_ports needs a label, proto and at least one port." "open_firewall_ports butuh label, proto, dan minimal satu port." "open_firewall_ports 需要标签、协议和至少一个端口。")"
+    return 0
+  fi
+  shift 2
+  log_step "$(T "Configuring firewall for $label ports ($proto): $*..." "Mengonfigurasi firewall untuk port-port $label ($proto): $*..." "正在为 $label 防火墙端口 ($proto) 配置防火墙：$*...")"
+  FW_BATCH=1
+  local p seen=" "
+  for p in "$@"; do
+    case "$seen" in
+      *" $p "*) continue ;;
+    esac
+    seen="$seen$p "
+    _fw_allow_port "$p" "$proto" "$label"
+  done
+  FW_BATCH=0
+  fw_detect_backend
+  case "$FW_BACKEND" in
+    ufw) ufw reload >/dev/null 2>&1 || true ;;
+    firewalld) firewall-cmd --reload >/dev/null 2>&1 || true ;;
+  esac
+  log_success "$(T "All $label firewall ports ($proto) are ready." "Semua port firewall $label ($proto) siap." "$label 防火墙端口 ($proto) 已全部就绪。")"
+}
+
 close_firewall_port() {
-  local port="$1" proto="${2:-udp}"
+  local port="${1:?port required}" proto="${2:-udp}"
   log_info "$(T "Removing firewall rule for port $port/$proto..." "Menghapus aturan firewall untuk port $port/$proto..." "正在删除端口 $port/$proto 的防火墙规则...")"
 
   if command -v ufw &>/dev/null; then
-    ufw delete allow "$port/$proto" >/dev/null 2>&1 || true
+    ufw --force delete allow "$port/$proto" >/dev/null 2>&1 || true
   fi
 
   if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
-    firewall-cmd --zone=public --remove-port="$port/$proto" --permanent >/dev/null 2>&1 || true
+    local zone
+    zone="$(firewall-cmd --get-default-zone 2>/dev/null || echo "public")"
+    firewall-cmd --zone="$zone" --remove-port="$port/$proto" --permanent >/dev/null 2>&1 || true
     firewall-cmd --reload >/dev/null 2>&1 || true
+  fi
+
+  _fw_remove_accept_rule "$port" "$proto"
+}
+
+# Close many ports with a single banner (v4.6). Usage:
+#   close_firewall_ports "tcp" 80 443 10001 10002
+close_firewall_ports() {
+  local proto="${1:-tcp}"
+  shift || true
+  if [[ $# -lt 1 ]]; then
+    log_warn "$(T "close_firewall_ports needs a proto and at least one port." "close_firewall_ports butuh proto dan minimal satu port." "close_firewall_ports 需要协议和至少一个端口。")"
+    return 0
+  fi
+  local p seen=" "
+  for p in "$@"; do
+    case "$seen" in
+      *" $p "*) continue ;;
+    esac
+    seen="$seen$p "
+    close_firewall_port "$p" "$proto"
+  done
+}
+
+# One-line summary of the firewall state (used by status.sh).
+fw_status_summary() {
+  fw_detect_backend
+  echo "$(T "Firewall backend       : " "Backend Firewall       : " "防火墙后端            : ")$FW_BACKEND"
+  if fw_is_filtering_active; then
+    echo "$(T "Packet filtering      : " "Packet Filtering      : " "包过滤               : ")$(T "ACTIVE (rules enforced)" "AKTIF (aturan ditegakkan)" "运行中（规则生效）")"
+  else
+    echo "$(T "Packet filtering      : " "Packet Filtering      : " "包过滤               : ")$(T "INACTIVE (all ports reachable)" "NONAKTIF (semua port terbuka)" "未运行（所有端口可访问）")"
   fi
 }

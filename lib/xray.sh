@@ -438,8 +438,7 @@ EOF
   fi
 
   # Open every inbound port in the firewall (WebSocket + gRPC + XHTTP)
-  for p in "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC" "$XPORT_XHTTP_SHARED"; do
-    open_firewall_port "$p" "tcp"
+  open_firewall_ports "Xray" "tcp" "$XPORT_VMESS_WS" "$XPORT_VLESS_WS" "$XPORT_TROJAN_WS" "$XPORT_VLESS_XTLS" "$XPORT_VLESS_REALITY" "$XPORT_VMESS_GRPC" "$XPORT_VLESS_GRPC" "$XPORT_TROJAN_GRPC" "$XPORT_VLESS_REALITY_GRPC" "$XPORT_XHTTP_SHARED"
   done
 
   # Register the default server account

@@ -3,13 +3,14 @@
 **Oleh**: wrwb Store  
 **Repository**: VPN Multi-Protocol Linux Installer
 
-Dokumen ini merangkum semua rilis dari v1.2 hingga v4.5. Detail lengkap setiap versi ada di folder `changelogs/`.
+Dokumen ini merangkum semua rilis dari v1.2 hingga v4.6. Detail lengkap setiap versi ada di folder `changelogs/`.
 
 ---
 
 ## 📚 Navigasi Cepat
 
-- [v4.5 (Latest - 14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — **Environment Checks + ARM64 Support**
+- [v4.6 (Latest - 14 Oktober 2026)](#v46---dynamic-firewall-handling) — **Dynamic Firewall Handling**
+- [v4.5 (14 Oktober 2026)](#v45---comprehensive-environment--access-checks--arm64-support) — Environment Checks + ARM64 Support
 - [v4.4 (14 Oktober 2026)](#v44---enhanced-distro--package-manager-detection) — Enhanced OS Detection (20+ distros)
 - [v4.3 (14 Oktober 2026)](#v43---organized-changelog-structure) — Organized Changelog Structure
 - [v4.2 (14 Oktober 2026)](#v42---xhttp-transport-ultimate-http-stealth) — **XHTTP Transport (Port 80/443)**
@@ -23,6 +24,24 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.5. Detail lengkap setiap v
 - [v1.4 (13 Oktober 2026)](#v14---trilingual-support) — Trilingual Support (EN/ID/ZH)
 - [v1.3 (13 Oktober 2026)](#v13---shadowsocks-support) — Shadowsocks Support
 - [v1.2 (13 Oktober 2026)](#v12---initial-release) — Initial Release
+
+---
+
+## v4.6 — Dynamic Firewall Handling
+
+**Tanggal**: 14 Oktober 2026
+**Detail**: [changelogs/v4.6.md](changelogs/v4.6.md)
+
+### 🔥 Highlight
+
+**Penanganan Firewall Secara Dinamis — hanya tambah aturan bila filtering aktif**
+
+- ✅ **Auto-detect backend**: UFW → firewalld → iptables → nft → none
+- ✅ **Skip aturan bila tidak perlu** — VPS default (semua ACCEPT) tidak disentuh
+- ✅ **Dukungan nftables native** — aturan di chain `inet filter input` yang ada
+- ✅ **Idempotent** — re-run tidak pernah membuat aturan duplikat
+- ✅ **Batch open/close** — setup Xray 10 port cukup 1 reload
+- ✅ **Bug fix**: `close_firewall_port` kini benar-benar menghapus aturan iptables/nft
 
 ---
 
@@ -318,7 +337,8 @@ Jika OS ID tidak dikenali:
 | v4.2 | 13 | + 4 XHTTP (VMess/VLESS/Trojan/REALITY) 🏆 |
 | v4.3 | 13 | (Changelog organization, no new protocols) |
 | v4.4 | 13 | (Enhanced OS detection: 20+ distros) 🔍 |
-| **v4.5** | **13** | **(Environment checks + ARM64 support)** ✅ |
+| v4.5 | 13 | (Environment checks + ARM64 support) ✅ |
+| **v4.6** | **13** | **(Dynamic firewall handling)** 🔥 |
 
 ---
 
@@ -364,4 +384,4 @@ sudo ./menu.sh
 
 ---
 
-**Dibuat oleh wrwb Store** — v4.5 (Environment Checks + ARM64 Support + XHTTP Transport + 13 Protocols)
+**Dibuat oleh wrwb Store** — v4.6 (Dynamic Firewall + Environment Checks + ARM64 + 13 Protocols)

@@ -53,7 +53,7 @@
 | ⚡ **Xray-core (default ON)** | v26.3.27 stable — 5 inbounds at once: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID works for all protocols + auto links & QR |
 | 🔄 **Alternative engine** | v2ray-core v5.53.0 (switch via `--with-v2ray` or `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, `.ovpn` profile) as SSH replacement |
 | 👻 **Shadowsocks (optional)** | shadowsocks-rust v1.25.0, AEAD-2022 cipher `2022-blake3-aes-256-gcm` + `ss://` URI + QR |
-| 🛡️ **Auto firewall** | Opens all VPN ports (UDP + TCP) in **UFW** (Debian/Ubuntu) or **firewalld** (RHEL/Rocky) |
+| 🛡️ **Auto firewall** | Detects the active firewall backend (**UFW** / **firewalld** / **nftables** / **iptables**) and opens VPN ports only when filtering is active — idempotent, no duplicate rules |
 | 🌐 **IP Forwarding** | Enables `net.ipv4.ip_forward=1` + IPv6 forwarding persistently (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
 | 🔀 **NAT / Masquerade** | Automatic `iptables ... -j MASQUERADE` via WireGuard `PostUp`/`PostDown` so client internet works |
@@ -211,7 +211,7 @@ See all options:
 5. Asks/uses params (port, DNS, client name, SSH-vs-OpenVPN, Xray-vs-V2Ray).
 6. Validates port & client name, checks if UDP port is used by another app.
 7. Installs WireGuard packages + enables IP forwarding & throughput tuning (BBR, TCP buffers).
-8. Opens WireGuard UDP port in UFW / firewalld.
+8. Opens WireGuard UDP port via dynamic firewall (UFW / firewalld / nftables / iptables).
 9. Generates server keypair, writes `wg0.conf` (MTU 1420 + NAT `PostUp`/`PostDown`), saves `params`.
 10. Creates first WireGuard client + `.conf` + QR Code, then enables & starts `wg-quick@wg0`.
 11. **Installs SSH VPN** (default): OpenSSH hardening + Dropbear:143 + Stunnel:444 + WebSocket:80.
@@ -351,8 +351,8 @@ sudo ./uninstall.sh
   iptables -t nat -I POSTROUTING -o <main-iface> -j MASQUERADE
   ```
   (plus `ip6tables` equivalents), auto-cleaned on `PostDown`.
-- **UFW:** when active, all ports opened + `DEFAULT_FORWARD_POLICY` changed to `ACCEPT`.
-- **firewalld:** when active, all ports opened + permanent `masquerade`.
+- **UFW:** when active, all ports opened (single batched reload) + `DEFAULT_FORWARD_POLICY` changed to `ACCEPT`.
+- **firewalld:** when active, all ports opened + permanent `masquerade` (single batched reload). **Pure nftables/iptables backends:** ACCEPT rules are added only when filtering is active — when all policies are ACCEPT (VPS default), no rules are added.
 
 ---
 

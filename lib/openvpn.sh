@@ -155,7 +155,7 @@ EOF
   fi
 
   # Open the firewall
-  open_firewall_port "$port" "$proto"
+  open_firewall_port "$port" "$proto" "OpenVPN"
 
   # NAT rules for OpenVPN
   iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o "$iface" -j MASQUERADE 2>/dev/null || true
