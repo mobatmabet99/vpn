@@ -43,6 +43,8 @@ source "$SCRIPT_DIR/lib/ssh.sh"
 source "$SCRIPT_DIR/lib/xray.sh"
 # shellcheck source=lib/limits.sh
 source "$SCRIPT_DIR/lib/limits.sh"
+# shellcheck source=lib/ssl.sh
+source "$SCRIPT_DIR/lib/ssl.sh"
 
 # Default configuration
 DEFAULT_PORT="51820"
@@ -78,6 +80,8 @@ WITH_SHADOWSOCKS=0
 # SSH & Xray enabled by default — can be disabled explicitly via --no-ssh / --no-xray
 WITH_SSH=1
 WITH_XRAY=1
+# acme.sh pre-install enabled by default — disable explicitly via --no-ssl
+WITH_SSL=1
 # Tunnel engine: "xray" (default, XTLS+REALITY) or "v2ray"
 XRAY_ENGINE="${XRAY_ENGINE:-xray}"
 
@@ -110,6 +114,10 @@ parse_args() {
         WITH_XRAY=1; XRAY_ENGINE="v2ray"; shift ;;
       --no-xray)
         WITH_XRAY=0; shift ;;
+      --with-ssl)
+        WITH_SSL=1; shift ;;
+      --no-ssl)
+        WITH_SSL=0; shift ;;
       -h|--help)
         echo "$(T "Usage: sudo ./install.sh [options]" "Penggunaan: sudo ./install.sh [opsi]" "用法：sudo ./install.sh [选项]")"
         echo "$(T "Options:" "Opsi:" "选项：")"
@@ -125,6 +133,7 @@ parse_args() {
         echo "      --with-v2ray           $(T "Install v2ray-core (replaces Xray)" "Pasang v2ray-core (pengganti Xray)" "安装 v2ray-core（替代 Xray）")"
         echo "      --no-xray              $(T "Install neither Xray nor V2Ray" "Jangan pasang Xray/V2Ray" "既不安装 Xray 也不安装 V2Ray")"
         echo "      --with-shadowsocks     $(T "Also install Shadowsocks" "Sekaligus instal Shadowsocks" "同时安装 Shadowsocks")"
+      echo "      --with-ssl / --no-ssl      $(T "Pre-install acme.sh SSL client (DEFAULT ON)" "Pre-instal klien SSL acme.sh (DEFAULT AKTIF)" "预安装 acme.sh SSL 客户端（默认开启）")"
         echo "  -h, --help                 $(T "Show this help" "Tampilkan bantuan ini" "显示此帮助")"
         echo ""
         echo "$(T "Examples:" "Contoh:" "示例：")"
@@ -258,6 +267,9 @@ main() {
       *) WITH_XRAY=1; XRAY_ENGINE="xray" ;;
     esac
 
+    read -rp "$(T "Also pre-install acme.sh SSL client (DEFAULT Y)? [Y/n]: " "Ikut pre-instal klien SSL acme.sh (DEFAULT Y)? [Y/n]: " "同时预安装 acme.sh SSL 客户端（默认 Y）吗？[Y/n]：")" ask_ssl
+    [[ "$ask_ssl" =~ ^[Nn]$ ]] && WITH_SSL=0 || true
+
     read -rp "$(T "Also install Shadowsocks? [y/N]: " "Ingin sekalian memasang Shadowsocks? [y/N]: " "同时安装 Shadowsocks 吗？[y/N]：")" ask_ss
     [[ "$ask_ss" =~ ^[Yy]$ ]] && WITH_SHADOWSOCKS=1 || true
   fi
@@ -330,6 +342,14 @@ main() {
   log_info "$(T "Default limit for '$FIRST_CLIENT': 2 concurrent IPs, 100 GB/month." "Limit default '$FIRST_CLIENT': 2 IP concurrent, 100 GB/bulan." "'$FIRST_CLIENT' 的默认限制：2 个并发 IP，100 GB/月。")"
   limits_install_monitor_service
 
+  # 15c. Pre-install acme.sh SSL client by default (v4.7+: soft mode, never fatal)
+  if [[ "${WITH_SSL:-1}" -eq 1 ]]; then
+    log_step "$(T "Pre-installing acme.sh SSL client (default ON)..." "Pre-instal klien SSL acme.sh (default AKTIF)..." "正在预安装 acme.sh SSL 客户端（默认开启）...")"
+    ssl_install_acme --soft || log_warn "$(T "acme.sh pre-install skipped — run menu 24 or ./setup-ssl.sh later." "Pre-instal acme.sh dilewati — jalankan menu 24 atau ./setup-ssl.sh nanti." "已跳过 acme.sh 预安装 — 稍后请运行菜单 24 或 ./setup-ssl.sh。")"
+  else
+    log_info "$(T "acme.sh pre-install skipped (--no-ssl)." "Pre-instal acme.sh dilewati (--no-ssl)." "已跳过 acme.sh 预安装 (--no-ssl)。")"
+  fi
+
   # 16. Show QR code & final instructions
   echo ""
   log_success "$(T "WireGuard VPN installation COMPLETE!" "Instalasi VPN WireGuard SELESAI!" "WireGuard VPN 安装完成！")"
@@ -353,6 +373,8 @@ main() {
   echo "  - $(T "List clients    : sudo ./list-clients.sh" "Daftar client    : sudo ./list-clients.sh" "列出客户端：sudo ./list-clients.sh")"
   echo "  - $(T "Check status    : sudo ./status.sh" "Cek status       : sudo ./status.sh" "检查状态：sudo ./status.sh")"
   echo "  - $(T "Interactive menu: sudo ./menu.sh" "Menu interaktif  : sudo ./menu.sh" "交互式菜单：sudo ./menu.sh")"
+  echo "  - $(T "SSL certificate : sudo ./setup-ssl.sh (menu 24, acme.sh pre-installed)" "Sertifikat SSL    : sudo ./setup-ssl.sh (menu 24, acme.sh sudah terinstal)" "SSL 证书：sudo ./setup-ssl.sh（菜单 24，acme.sh 已预安装）")"
+  echo "  - $(T "SSL status      : sudo ./setup-ssl.sh --status" "Status SSL        : sudo ./setup-ssl.sh --status" "SSL 状态：sudo ./setup-ssl.sh --status")"
   if [[ "$WITH_SSH" -eq 1 ]]; then
     echo "  - $(T "SSH accounts    : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "Akun SSH         : sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>" "SSH 账号：sudo ./add-ssh-user.sh <username> | sudo ./remove-ssh-user.sh <username>")"
   fi

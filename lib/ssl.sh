@@ -79,20 +79,44 @@ ssl_install_deps() {
 }
 
 # Install acme.sh bila belum ada (idempotent)
+# Argumen opsional: --soft (atau 1) => bila gagal hanya warning + return 1.
+# Dipakai install.sh default agar instalasi VPN tetap lanjut bila download gagal.
 ssl_install_acme() {
+  local soft=0
+  if [[ "${1:-}" == "--soft" || "${1:-}" == "1" || "${1:-}" == "soft" ]]; then
+    soft=1
+  fi
   if [[ -x "$ACME_BIN" ]]; then
     log_info "$(T "acme.sh already installed at $ACME_BIN" "acme.sh sudah terinstal di $ACME_BIN" "acme.sh 已安装于 $ACME_BIN")"
     return 0
   fi
   ssl_install_deps
   log_step "$(T "Installing acme.sh (lightweight ACME client)..." "Menginstal acme.sh (ACME client ringan)..." "正在安装 acme.sh（轻量 ACME 客户端）...")"
-  curl -fsSL https://get.acme.sh -o /tmp/get-acme.sh || \
+  if ! curl -fsSL https://get.acme.sh -o /tmp/get-acme.sh; then
+    rm -f /tmp/get-acme.sh
+    if [[ "$soft" -eq 1 ]]; then
+      log_warn "$(T "Could not download acme.sh installer — skipping pre-install (run menu 24 / setup-ssl.sh later)." "Gagal mengunduh installer acme.sh — pre-instal dilewati (jalankan menu 24 / setup-ssl.sh nanti)." "下载 acme.sh 安装程序失败 — 已跳过预安装（稍后请运行菜单 24 / setup-ssl.sh）。")"
+      return 1
+    fi
     die "$(T "Failed to download acme.sh installer. Check internet connection." "Gagal mengunduh installer acme.sh. Periksa koneksi internet." "下载 acme.sh 安装程序失败。请检查网络连接。")"
-  sh /tmp/get-acme.sh --nocron || sh /tmp/get-acme.sh || \
+  fi
+  if ! sh /tmp/get-acme.sh --nocron && ! sh /tmp/get-acme.sh; then
+    rm -f /tmp/get-acme.sh
+    if [[ "$soft" -eq 1 ]]; then
+      log_warn "$(T "acme.sh pre-install failed — skipping (run menu 24 / setup-ssl.sh later)." "Pre-instal acme.sh gagal — dilewati (jalankan menu 24 / setup-ssl.sh nanti)." "acme.sh 预安装失败 — 已跳过（稍后请运行菜单 24 / setup-ssl.sh）。")"
+      return 1
+    fi
     die "$(T "acme.sh installation failed." "Instalasi acme.sh gagal." "acme.sh 安装失败。")"
+  fi
   rm -f /tmp/get-acme.sh
-  [[ -x "$ACME_BIN" ]] || die "$(T "acme.sh binary not found after install at $ACME_BIN" "Binary acme.sh tidak ditemukan setelah instalasi di $ACME_BIN" "安装后未在 $ACME_BIN 找到 acme.sh")"
-  # Paksa CA ke Let's Encrypt (tanpa registrasi email)
+  if [[ ! -x "$ACME_BIN" ]]; then
+    if [[ "$soft" -eq 1 ]]; then
+      log_warn "$(T "acme.sh binary missing after pre-install — skipping." "Binary acme.sh tidak ada setelah pre-instal — dilewati." "预安装后未找到 acme.sh — 已跳过。")"
+      return 1
+    fi
+    die "$(T "acme.sh binary not found after install at $ACME_BIN" "Binary acme.sh tidak ditemukan setelah instalasi di $ACME_BIN" "安装后未在 $ACME_BIN 找到 acme.sh")"
+  fi
+  # Paksa CA ke Lets Encrypt (tanpa registrasi email)
   "$ACME_BIN" --set-default-ca --server "$ACME_SERVER_DEFAULT" >/dev/null 2>&1 || true
   log_success "$(T "acme.sh installed ($("$ACME_BIN" --version 2>/dev/null | head -n1))." "acme.sh terinstal ($("$ACME_BIN" --version 2>/dev/null | head -n1))." "acme.sh 已安装（$("$ACME_BIN" --version 2>/dev/null | head -n1)）。")"
 }

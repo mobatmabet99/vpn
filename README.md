@@ -53,7 +53,7 @@ Skrip **otomatisasi instalasi VPN siap pakai** berbasis **WireGuard** sebagai me
 | ⚡ **Xray-core v4 (default ON)** | v26.10.10 stabil (Okt 2026) — **9 inbound sekaligus**: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**, **VMess gRPC (10005)**, **VLESS gRPC (10006)**, **Trojan gRPC (10007)**, **VLESS REALITY gRPC (10008)**. 1 UUID berlaku untuk semua protokol + link & QR otomatis. **gRPC = HTTP/2 based, sangat lancar di Debian 13 & Ubuntu 26, cocok untuk CDN/reverse proxy** |
 | 🔄 **Alternatif engine** | v2ray-core v5.53.0 (ganti via `--with-v2ray` atau `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, profil `.ovpn`) sebagai pengganti SSH |
 | 👻 **Shadowsocks (opsional)** | shadowsocks-rust v1.25.0, cipher AEAD-2022 `2022-blake3-aes-256-gcm` + URI `ss://` + QR |
-| 🔒 **SSL otomatis (v4.7)** | Sertifikat TLS via **acme.sh** (ringan, tanpa Python berat) — mode **Standalone** (port 80 sementara) atau **DNS API Cloudflare** (tahan CDN/firewall). Auto-renew via cron, tersimpan di `/etc/vpn-ssl/<domain>/` untuk Xray TLS / Stunnel / Nginx. Menu 24 / `./setup-ssl.sh` |
+| 🔒 **SSL otomatis (v4.7)** | Sertifikat TLS via **acme.sh** (ringan, tanpa Python berat) — mode **Standalone** (port 80 sementara) atau **DNS API Cloudflare** (tahan CDN/firewall). Auto-renew via cron, tersimpan di `/etc/vpn-ssl/<domain>/` untuk Xray TLS / Stunnel / Nginx. acme.sh **pre-instal default** saat `install.sh` (nonaktifkan via `--no-ssl`) — terbitkan sertifikat via Menu 24 / `./setup-ssl.sh` |
 | 🛡️ **Firewall otomatis** | Mendeteksi backend firewall aktif (**UFW** / **firewalld** / **nftables** / **iptables**) dan membuka port VPN hanya bila filtering aktif — idempotent, tanpa aturan duplikat |
 | 🌐 **IP Forwarding** | Mengaktifkan `net.ipv4.ip_forward=1` + IPv6 forwarding secara persisten (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Optimasi throughput** | `MTU = 1420` di server & client, TCP BBR + buffer 25 MB via sysctl |
@@ -202,6 +202,7 @@ Lihat semua opsi:
 | `--with-openvpn` | Pasang OpenVPN **pengganti** SSH (saling eksklusif, bisa dikombinasi manual) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pilih engine tunnel (default: Xray). `--with-v2ray` = engine v2ray-core |
 | `--with-shadowsocks` | Tambah Shadowsocks sekalian (default: tidak) |
+| `--with-ssl` / `--no-ssl` | Pre-instal acme.sh SSL client (default: ya) |
 | `--lang en|id|zh` | Bahasa instalasi (default: en). Juga via env `VPN_LANG=en|id|zh` |
 | `-p/-c/-d/-y` | Port WG, nama client pertama, DNS, mode non-interaktif |
 

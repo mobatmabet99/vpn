@@ -53,7 +53,7 @@
 | ⚡ **Xray-core (default ON)** | v26.3.27 stable — 5 inbounds at once: VMess WS (10001), VLESS WS (10002), Trojan WS (10003), VLESS TCP XTLS-Vision (10004), **VLESS TCP XTLS-Vision + REALITY (443)**. 1 UUID works for all protocols + auto links & QR |
 | 🔄 **Alternative engine** | v2ray-core v5.53.0 (switch via `--with-v2ray` or `XRAY_ENGINE=v2ray`); OpenVPN 2.7/2.6 (cipher `AES-256-GCM` + `CHACHA20-POLY1305`, auth `SHA512`, TLS min 1.3, `.ovpn` profile) as SSH replacement |
 | 👻 **Shadowsocks (optional)** | shadowsocks-rust v1.25.0, AEAD-2022 cipher `2022-blake3-aes-256-gcm` + `ss://` URI + QR |
-| 🔒 **Auto SSL (v4.7)** | TLS certificates via **acme.sh** (lightweight, no heavy Python) — **Standalone** mode (temporary port 80) or **Cloudflare DNS API** (CDN/firewall-proof). Auto-renew via cron, stored in `/etc/vpn-ssl/<domain>/` for Xray TLS / Stunnel / Nginx. Menu 24 / `./setup-ssl.sh` |
+| 🔒 **Auto SSL (v4.7)** | TLS certificates via **acme.sh** (lightweight, no heavy Python) — **Standalone** mode (temporary port 80) or **Cloudflare DNS API** (CDN/firewall-proof). Auto-renew via cron, stored in `/etc/vpn-ssl/<domain>/` for Xray TLS / Stunnel / Nginx. acme.sh **pre-installed by default** during `install.sh` (disable via `--no-ssl`) — issue certs via Menu 24 / `./setup-ssl.sh` |
 | 🛡️ **Auto firewall** | Detects the active firewall backend (**UFW** / **firewalld** / **nftables** / **iptables**) and opens VPN ports only when filtering is active — idempotent, no duplicate rules |
 | 🌐 **IP Forwarding** | Enables `net.ipv4.ip_forward=1` + IPv6 forwarding persistently (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **Throughput tuning** | `MTU = 1420` on server & client, TCP BBR + 25 MB buffers via sysctl |
@@ -200,6 +200,7 @@ See all options:
 | `--with-openvpn` | Install OpenVPN **instead of** SSH (mutually exclusive, can combine manually) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | Pick tunnel engine (default: Xray). `--with-v2ray` = v2ray-core engine |
 | `--with-shadowsocks` | Also add Shadowsocks (default: no) |
+| `--with-ssl` / `--no-ssl` | Pre-install acme.sh SSL client (default: yes) |
 | `--lang en|id|zh` | Installer language (default: en). Also `VPN_LANG=en|id|zh` env |
 | `-p/-c/-d/-y` | WG port, first client name, DNS, non-interactive mode |
 

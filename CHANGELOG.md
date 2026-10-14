@@ -42,6 +42,7 @@ Dokumen ini merangkum semua rilis dari v1.2 hingga v4.7. Detail lengkap setiap v
 - ✅ **DNS API Cloudflare** — tanpa buka port, handal di balik CDN/firewall (`CF_Token`)
 - ✅ **Auto-renew via cron** — cek harian, renew bila sisa < 30 hari + auto-reload Xray
 - ✅ **Menu 24 / `./setup-ssl.sh`** — CLI + interaktif, status di `status.sh`, cleanup di `uninstall.sh`
+- ✅ **Pre-instal default** — acme.sh terinstal otomatis saat `install.sh` (soft mode, `--no-ssl` untuk skip)
 
 ---
 

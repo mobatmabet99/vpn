@@ -53,7 +53,7 @@
 | ⚡ **Xray-core (默认开启)** | v26.3.27 稳定版 — 5 个入站同时运行：VMess WS (10001)、VLESS WS (10002)、Trojan WS (10003)、VLESS TCP XTLS-Vision (10004)、**VLESS TCP XTLS-Vision + REALITY (443)**。1 个 UUID 通用于所有协议 + 自动生成链接与二维码 |
 | 🔄 **备用引擎** | v2ray-core v5.53.0 (通过 `--with-v2ray` 或 `XRAY_ENGINE=v2ray` 切换)；OpenVPN 2.7/2.6 (加密 `AES-256-GCM` + `CHACHA20-POLY1305`，认证 `SHA512`，TLS 最低 1.3，`.ovpn` 配置) 可替代 SSH |
 | 👻 **Shadowsocks (可选)** | shadowsocks-rust v1.25.0，AEAD-2022 加密 `2022-blake3-aes-256-gcm` + `ss://` URI + 二维码 |
-| 🔒 **自动 SSL (v4.7)** | 经 **acme.sh** 签发 TLS 证书（轻量，无重型 Python 依赖）— **Standalone** 模式（临时端口 80）或 **Cloudflare DNS API**（不怕 CDN/防火墙）。cron 自动续期，存于 `/etc/vpn-ssl/<domain>/`，可用于 Xray TLS / Stunnel / Nginx。菜单 24 / `./setup-ssl.sh` |
+| 🔒 **自动 SSL (v4.7)** | 经 **acme.sh** 签发 TLS 证书（轻量，无重型 Python 依赖）— **Standalone** 模式（临时端口 80）或 **Cloudflare DNS API**（不怕 CDN/防火墙）。cron 自动续期，存于 `/etc/vpn-ssl/<domain>/`，可用于 Xray TLS / Stunnel / Nginx。菜单 24 / `./setup-ssl.sh`（`install.sh` 默认预安装 acme.sh，经 `--no-ssl` 禁用）|
 | 🛡️ **自动防火墙** | 检测活动的防火墙后端（**UFW** / **firewalld** / **nftables** / **iptables**），仅在包过滤启用时开放 VPN 端口 — 幂等，无重复规则 |
 | 🌐 **IP 转发** | 持久化启用 `net.ipv4.ip_forward=1` + IPv6 转发 (`/etc/sysctl.d/99-vpn-forward.conf`) |
 | 🚀 **吞吐优化** | 服务端与客户端 `MTU = 1420`，TCP BBR + 25 MB 缓冲区 sysctl 优化 |
@@ -197,6 +197,7 @@ XRAY_ENGINE=v2ray sudo ./install.sh --yes
 | `--with-openvpn` | 安装 OpenVPN **替代** SSH (互斥，可手动组合) |
 | `--with-xray` / `--with-v2ray` / `--no-xray` | 选择隧道引擎 (默认 Xray)。`--with-v2ray` = v2ray-core 引擎 |
 | `--with-shadowsocks` | 同时安装 Shadowsocks (默认：不装) |
+| `--with-ssl` / `--no-ssl` | 预安装 acme.sh SSL 客户端（默认：是）|
 | `--lang en|id|zh` | 安装语言 (默认 en)。也可用 `VPN_LANG=en|id|zh` 环境变量 |
 | `-p/-c/-d/-y` | WG 端口、首个客户端名、DNS、非交互模式 |
 
